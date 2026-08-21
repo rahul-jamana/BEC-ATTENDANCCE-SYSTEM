@@ -76,7 +76,12 @@ export const AuthProvider = ({ children }) => {
     userFromDb = allUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
 
     if (!userFromDb) {
-      throw new Error("Invalid credentials or account not found.");
+      throw new Error("Invalid credentials: No account found with this email.");
+    }
+
+    // Password verification logic
+    if (userFromDb.password && userFromDb.password !== password) {
+      throw new Error("Incorrect password. Please check your password and try again.");
     }
 
     if (isLiveFirebaseConfigured && auth) {
