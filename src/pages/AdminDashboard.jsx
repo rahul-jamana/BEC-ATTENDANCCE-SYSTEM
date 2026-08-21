@@ -5,7 +5,8 @@ import { parseStudentExcel } from "../utils/excelParser";
 import { exportAttendancePDF, exportAttendanceExcel } from "../utils/pdfExporter";
 import { 
   Shield, UserCheck, UserX, Users, BookOpen, Upload, FileText, Download, 
-  Trash2, Plus, RefreshCw, CheckCircle, AlertCircle, Layers, ClipboardCheck
+  Trash2, Plus, RefreshCw, CheckCircle, AlertCircle, Layers, ClipboardCheck,
+  HeartPulse, Sparkles, AlertTriangle
 } from "lucide-react";
 
 export const AdminDashboard = () => {
@@ -30,12 +31,24 @@ export const AdminDashboard = () => {
   const [bputExplorerBranch, setBputExplorerBranch] = useState("CSE");
   const [bputExplorerSem, setBputExplorerSem] = useState("3");
 
-  // Admin Attendance Form
+  // Admin Attendance Mode: "bulk" (class section) or "medical" (student 75% boost)
+  const [attMode, setAttMode] = useState("medical");
+
+  // Admin Attendance Form (Bulk)
   const [attForm, setAttForm] = useState({ branch: "CSE", year: "1st", section: "A", semester: "1", subjectCode: "" });
   const [attSelectedStudents, setAttSelectedStudents] = useState([]);
   const [attMsg, setAttMsg] = useState("");
   const [attError, setAttError] = useState("");
   const [attProcessing, setAttProcessing] = useState(false);
+
+  // Medical Relief / Attendance Override State
+  const [medStudentId, setMedStudentId] = useState("");
+  const [medTargetPct, setMedTargetPct] = useState("75");
+  const [medReason, setMedReason] = useState("Medical Grounds (Hospitalization / Certified Illness)");
+  const [medStudentStats, setMedStudentStats] = useState([]);
+  const [medLoading, setMedLoading] = useState(false);
+  const [medSuccess, setMedSuccess] = useState("");
+  const [medError, setMedError] = useState("");
 
   const loadAdminData = async () => {
     const allUsers = await DataService.getUsers();
@@ -218,6 +231,52 @@ export const AdminDashboard = () => {
       setAttProcessing(false);
     }
   };
+
+  // Load live stats for selected medical student
+  useEffect(() => {
+    if (medStudentId) {
+      const student = users.find(u => u.uid === medStudentId);
+      if (student) {
+        DataService.getStudentSubjectStats(student).then(setMedStudentStats);
+      }
+    } else {
+      setMedStudentStats([]);
+    }
+  }, [medStudentId, users, attendance, sessions]);
+
+  // Handle granting medical / special exemption attendance boost
+  const handleGrantMedicalExemption = async () => {
+    if (!medStudentId) {
+      setMedError("Please select a student from the list.");
+      return;
+    }
+    setMedLoading(true);
+    setMedSuccess("");
+    setMedError("");
+    try {
+      const res = await DataService.adminBoostAttendanceToTarget({
+        studentId: medStudentId,
+        targetPercentage: parseInt(medTargetPct, 10),
+        reason: medReason,
+        adminName: userProfile?.name || "System Administrator"
+      });
+      setMedSuccess(`🎉 Medical Exemption Applied! ${res.studentName} (${res.rollNo}) boosted to ≥${res.targetPercentage}% across all subjects. (${res.totalRecordsAdded} attendance records recorded)`);
+      // Reload stats
+      const student = users.find(u => u.uid === medStudentId);
+      if (student) {
+        const newStats = await DataService.getStudentSubjectStats(student);
+        setMedStudentStats(newStats);
+      }
+      loadAdminData();
+    } catch (err) {
+      setMedError(err.message || "Failed to boost attendance.");
+    } finally {
+      setMedLoading(false);
+    }
+  };
+
+  // Approved students list for medical selection
+  const approvedStudents = users.filter(u => u.role === "student" && u.status === "approved");
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-100 via-sky-50 to-blue-100 pb-12">
@@ -643,148 +702,338 @@ export const AdminDashboard = () => {
 
         {/* TAB 4: ADMIN MARK ATTENDANCE */}
         {activeTab === "attendance" && (
-          <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 sm:p-8 shadow-sm border border-blue-100 space-y-6">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+          <div className="space-y-6">
+            
+            {/* Mode Switcher */}
+            <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-4 sm:p-6 shadow-sm border border-blue-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
-                <h2 className="text-xl font-bold text-slate-900">Admin Bulk Attendance</h2>
-                <p className="text-xs text-slate-500">Mark attendance for students directly — no QR scanning needed</p>
+                <h2 className="text-xl font-bold text-slate-900">Attendance Management &amp; Exemption Control</h2>
+                <p className="text-xs text-slate-500">Mark direct class attendance or apply Medical Exemption to boost attendance to ≥75%</p>
               </div>
-              <span className="px-3 py-1 bg-blue-100 text-blue-800 font-bold text-[10px] uppercase rounded-lg tracking-wider">BPUT Curriculum</span>
-            </div>
 
-            {attMsg && (
-              <div className="p-4 bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold rounded-2xl flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-emerald-600" />
-                <span>{attMsg}</span>
-              </div>
-            )}
-            {attError && (
-              <div className="p-4 bg-red-50 border border-red-300 text-red-800 text-xs font-bold rounded-2xl flex items-center gap-2">
-                <AlertCircle className="w-5 h-5 text-red-600" />
-                <span>{attError}</span>
-              </div>
-            )}
+              <div className="flex items-center space-x-2 bg-blue-50/80 p-1.5 rounded-2xl border border-blue-200/80">
+                <button
+                  onClick={() => setAttMode("medical")}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
+                    attMode === "medical"
+                      ? "bg-gradient-to-r from-rose-600 to-red-600 text-white shadow-md shadow-red-500/20"
+                      : "text-slate-600 hover:text-blue-700"
+                  }`}
+                >
+                  <HeartPulse className="w-4 h-4" />
+                  <span>🩺 Medical Exemption &amp; 75%+ Boost</span>
+                </button>
 
-            {/* Step 1: Filters */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Branch</label>
-                <select
-                  value={attForm.branch}
-                  onChange={(e) => { setAttForm({ ...attForm, branch: e.target.value, subjectCode: "" }); setAttSelectedStudents([]); }}
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs"
+                <button
+                  onClick={() => setAttMode("bulk")}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
+                    attMode === "bulk"
+                      ? "bg-gradient-to-r from-blue-600 to-sky-600 text-white shadow-md shadow-blue-500/20"
+                      : "text-slate-600 hover:text-blue-700"
+                  }`}
                 >
-                  {DataService.getDepartments().map(b => <option key={b} value={b}>{b}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Year</label>
-                <select
-                  value={attForm.year}
-                  onChange={(e) => { setAttForm({ ...attForm, year: e.target.value }); setAttSelectedStudents([]); }}
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs"
-                >
-                  {DataService.getYears().map(y => <option key={y} value={y}>{y}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Section</label>
-                <select
-                  value={attForm.section}
-                  onChange={(e) => { setAttForm({ ...attForm, section: e.target.value }); setAttSelectedStudents([]); }}
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs"
-                >
-                  {DataService.getSections().map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Semester</label>
-                <select
-                  value={attForm.semester}
-                  onChange={(e) => { setAttForm({ ...attForm, semester: e.target.value, subjectCode: "" }); }}
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs"
-                >
-                  {DataService.getSemesters().map(s => <option key={s} value={s}>Sem {s}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Subject</label>
-                <select
-                  value={attForm.subjectCode}
-                  onChange={(e) => setAttForm({ ...attForm, subjectCode: e.target.value })}
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs"
-                >
-                  <option value="">-- Select Subject --</option>
-                  {bputSubjectsForForm.map(s => <option key={s.code} value={s.code}>{s.code} — {s.name}</option>)}
-                </select>
+                  <ClipboardCheck className="w-4 h-4" />
+                  <span>👥 Class Section Bulk Marking</span>
+                </button>
               </div>
             </div>
 
-            {/* Step 2: Student List */}
-            <div className="border border-slate-200 rounded-2xl overflow-hidden">
-              <div className="bg-slate-50 px-4 py-3 flex items-center justify-between border-b border-slate-200">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={matchingStudents.length > 0 && attSelectedStudents.length === matchingStudents.length}
-                    onChange={(e) => handleSelectAllStudents(e.target.checked)}
-                    className="w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-600"
-                  />
-                  <span className="text-xs font-bold text-slate-700">Select All Students</span>
+            {/* SUB-VIEW 1: MEDICAL EXEMPTION / 75% BOOST */}
+            {attMode === "medical" && (
+              <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 sm:p-8 shadow-sm border border-rose-100 space-y-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-100 pb-4 gap-2">
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="px-2.5 py-0.5 bg-rose-100 text-rose-800 font-bold text-[10px] uppercase rounded-lg tracking-wider flex items-center gap-1">
+                        <HeartPulse className="w-3.5 h-3.5 text-rose-600" /> Medical &amp; Special Relief
+                      </span>
+                      <span className="text-xs text-slate-500">BPUT Clause: 75% Minimum Eligibility</span>
+                    </div>
+                    <h3 className="text-xl font-extrabold text-slate-900 mt-1">Student Attendance Medical Exemption Tool</h3>
+                    <p className="text-xs text-slate-500">If a student has medical issues or official leave, instantly boost their attendance to 75%+ across all subjects</p>
+                  </div>
                 </div>
-                <span className="text-[11px] font-mono font-bold text-slate-500">
-                  {attSelectedStudents.length} / {matchingStudents.length} selected
-                </span>
-              </div>
 
-              <div className="max-h-[300px] overflow-y-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-blue-50/60 border-b border-blue-100 text-[11px] font-bold text-slate-600 uppercase sticky top-0">
-                      <th className="py-2.5 px-4 w-10"></th>
-                      <th className="py-2.5 px-4">Roll No</th>
-                      <th className="py-2.5 px-4">Student Name</th>
-                      <th className="py-2.5 px-4">Branch / Section</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-xs">
-                    {matchingStudents.length === 0 ? (
-                      <tr>
-                        <td colSpan="4" className="py-8 text-center text-slate-400">
-                          No approved students found for {attForm.branch} — {attForm.year} — Sec {attForm.section}
-                        </td>
-                      </tr>
-                    ) : (
-                      matchingStudents.map((s) => (
-                        <tr key={s.uid} className={`hover:bg-blue-50/40 transition-colors ${attSelectedStudents.includes(s.uid) ? "bg-blue-50/60" : ""}`}>
-                          <td className="py-2.5 px-4">
-                            <input
-                              type="checkbox"
-                              checked={attSelectedStudents.includes(s.uid)}
-                              onChange={() => toggleStudent(s.uid)}
-                              className="w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-600"
-                            />
-                          </td>
-                          <td className="py-2.5 px-4 font-mono font-bold text-blue-700">{s.rollNo}</td>
-                          <td className="py-2.5 px-4 font-bold text-slate-800">{s.name}</td>
-                          <td className="py-2.5 px-4 text-slate-600">{s.branch} — {s.year} — Sec {s.section}</td>
+                {medSuccess && (
+                  <div className="p-4 bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold rounded-2xl flex items-center gap-2 animate-in fade-in">
+                    <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                    <span>{medSuccess}</span>
+                  </div>
+                )}
+                {medError && (
+                  <div className="p-4 bg-red-50 border border-red-300 text-red-800 text-xs font-bold rounded-2xl flex items-center gap-2 animate-in fade-in">
+                    <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+                    <span>{medError}</span>
+                  </div>
+                )}
+
+                {/* Step 1: Select Student */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="md:col-span-2 space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-800">Select Student for Medical Relief</label>
+                    <select
+                      value={medStudentId}
+                      onChange={(e) => {
+                        setMedStudentId(e.target.value);
+                        setMedSuccess("");
+                        setMedError("");
+                      }}
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-rose-500 focus:outline-none cursor-pointer"
+                    >
+                      <option value="">-- Choose Student (Roll No / Name) --</option>
+                      {approvedStudents.map((s) => (
+                        <option key={s.uid} value={s.uid}>
+                          {s.name} ({s.rollNo}) — {s.branch} {s.year} Sec-{s.section} (Sem {s.semester || "1"})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-800">Target Attendance %</label>
+                    <select
+                      value={medTargetPct}
+                      onChange={(e) => setMedTargetPct(e.target.value)}
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-rose-500 focus:outline-none cursor-pointer"
+                    >
+                      <option value="75">75% (Minimum BPUT Exam Eligibility)</option>
+                      <option value="80">80% (Safe Standard)</option>
+                      <option value="85">85% (High Standing)</option>
+                      <option value="90">90% (Distinction)</option>
+                      <option value="100">100% (Full Attendance Exemption)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Step 2: Reason / Certificate Description */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-800">Official Exemption Ground / Medical Certificate Note</label>
+                  <input
+                    type="text"
+                    value={medReason}
+                    onChange={(e) => setMedReason(e.target.value)}
+                    placeholder="e.g. Certified Medical Hospitalization / Severe Illness / Official College OD"
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                  />
+                </div>
+
+                {/* Live Subject Breakdown for Selected Student */}
+                {medStudentId && medStudentStats.length > 0 && (
+                  <div className="space-y-3 pt-2">
+                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
+                      Live Subject Attendance Breakdown
+                    </h4>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {medStudentStats.map((st) => (
+                        <div
+                          key={st.subjectId}
+                          className={`p-4 rounded-2xl border transition-all ${
+                            st.percentage < 75
+                              ? "bg-rose-50/70 border-rose-200 shadow-xs"
+                              : "bg-slate-50 border-slate-200"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono text-[10px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
+                              {st.code}
+                            </span>
+                            <span
+                              className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                                st.percentage < 75
+                                  ? "bg-red-100 text-red-800"
+                                  : "bg-emerald-100 text-emerald-800"
+                              }`}
+                            >
+                              {st.percentage < 75 ? "⚠️ Below 75%" : "✅ Eligible"}
+                            </span>
+                          </div>
+
+                          <h5 className="font-bold text-slate-900 text-sm mt-2">{st.subjectName}</h5>
+
+                          <div className="flex items-center justify-between text-xs text-slate-600 mt-2">
+                            <span>Classes: <strong>{st.attendedClasses} / {st.totalClasses}</strong></span>
+                            <span className="font-extrabold text-sm text-slate-900">{st.percentage}%</span>
+                          </div>
+
+                          {/* Progress bar */}
+                          <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden mt-2">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${
+                                st.percentage < 75 ? "bg-rose-500" : "bg-emerald-500"
+                              }`}
+                              style={{ width: `${Math.min(st.percentage, 100)}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Boost Button */}
+                <button
+                  onClick={handleGrantMedicalExemption}
+                  disabled={medLoading || !medStudentId}
+                  className="w-full py-4 bg-gradient-to-r from-rose-600 via-red-600 to-pink-600 hover:from-rose-700 hover:to-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-extrabold rounded-2xl text-sm transition-all shadow-lg shadow-rose-500/25 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <HeartPulse className="w-5 h-5 animate-pulse" />
+                  <span>
+                    {medLoading
+                      ? "Applying Medical Exemption & Boost..."
+                      : `🩺 Grant Medical Exemption & Boost to ≥${medTargetPct}% All Subjects`}
+                  </span>
+                </button>
+              </div>
+            )}
+
+            {/* SUB-VIEW 2: CLASS BULK ATTENDANCE */}
+            {attMode === "bulk" && (
+              <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 sm:p-8 shadow-sm border border-blue-100 space-y-6">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-900">Class Section Bulk Attendance</h2>
+                    <p className="text-xs text-slate-500">Mark attendance for an entire class or selected students for a subject lecture</p>
+                  </div>
+                  <span className="px-3 py-1 bg-blue-100 text-blue-800 font-bold text-[10px] uppercase rounded-lg tracking-wider">BPUT Curriculum</span>
+                </div>
+
+                {attMsg && (
+                  <div className="p-4 bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold rounded-2xl flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5 text-emerald-600" />
+                    <span>{attMsg}</span>
+                  </div>
+                )}
+                {attError && (
+                  <div className="p-4 bg-red-50 border border-red-300 text-red-800 text-xs font-bold rounded-2xl flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5 text-red-600" />
+                    <span>{attError}</span>
+                  </div>
+                )}
+
+                {/* Step 1: Filters */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Branch</label>
+                    <select
+                      value={attForm.branch}
+                      onChange={(e) => { setAttForm({ ...attForm, branch: e.target.value, subjectCode: "" }); setAttSelectedStudents([]); }}
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs"
+                    >
+                      {DataService.getDepartments().map(b => <option key={b} value={b}>{b}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Year</label>
+                    <select
+                      value={attForm.year}
+                      onChange={(e) => { setAttForm({ ...attForm, year: e.target.value }); setAttSelectedStudents([]); }}
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs"
+                    >
+                      {DataService.getYears().map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Section</label>
+                    <select
+                      value={attForm.section}
+                      onChange={(e) => { setAttForm({ ...attForm, section: e.target.value }); setAttSelectedStudents([]); }}
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs"
+                    >
+                      {DataService.getSections().map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Semester</label>
+                    <select
+                      value={attForm.semester}
+                      onChange={(e) => { setAttForm({ ...attForm, semester: e.target.value, subjectCode: "" }); }}
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs"
+                    >
+                      {DataService.getSemesters().map(s => <option key={s} value={s}>Sem {s}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Subject</label>
+                    <select
+                      value={attForm.subjectCode}
+                      onChange={(e) => setAttForm({ ...attForm, subjectCode: e.target.value })}
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs"
+                    >
+                      <option value="">-- Select Subject --</option>
+                      {bputSubjectsForForm.map(s => <option key={s.code} value={s.code}>{s.code} — {s.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Step 2: Student List */}
+                <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                  <div className="bg-slate-50 px-4 py-3 flex items-center justify-between border-b border-slate-200">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={matchingStudents.length > 0 && attSelectedStudents.length === matchingStudents.length}
+                        onChange={(e) => handleSelectAllStudents(e.target.checked)}
+                        className="w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-600"
+                      />
+                      <span className="text-xs font-bold text-slate-700">Select All Students</span>
+                    </div>
+                    <span className="text-[11px] font-mono font-bold text-slate-500">
+                      {attSelectedStudents.length} / {matchingStudents.length} selected
+                    </span>
+                  </div>
+
+                  <div className="max-h-[300px] overflow-y-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-blue-50/60 border-b border-blue-100 text-[11px] font-bold text-slate-600 uppercase sticky top-0">
+                          <th className="py-2.5 px-4 w-10"></th>
+                          <th className="py-2.5 px-4">Roll No</th>
+                          <th className="py-2.5 px-4">Student Name</th>
+                          <th className="py-2.5 px-4">Branch / Section</th>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-xs">
+                        {matchingStudents.length === 0 ? (
+                          <tr>
+                            <td colSpan="4" className="py-8 text-center text-slate-400">
+                              No approved students found for {attForm.branch} — {attForm.year} — Sec {attForm.section}
+                            </td>
+                          </tr>
+                        ) : (
+                          matchingStudents.map((s) => (
+                            <tr key={s.uid} className={`hover:bg-blue-50/40 transition-colors ${attSelectedStudents.includes(s.uid) ? "bg-blue-50/60" : ""}`}>
+                              <td className="py-2.5 px-4">
+                                <input
+                                  type="checkbox"
+                                  checked={attSelectedStudents.includes(s.uid)}
+                                  onChange={() => toggleStudent(s.uid)}
+                                  className="w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-600"
+                                />
+                              </td>
+                              <td className="py-2.5 px-4 font-mono font-bold text-blue-700">{s.rollNo}</td>
+                              <td className="py-2.5 px-4 font-bold text-slate-800">{s.name}</td>
+                              <td className="py-2.5 px-4 text-slate-600">{s.branch} — {s.year} — Sec {s.section}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
 
-            {/* Step 3: Submit */}
-            <button
-              onClick={handleAdminMarkAttendance}
-              disabled={attProcessing || attSelectedStudents.length === 0 || !attForm.subjectCode}
-              className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-700 hover:to-sky-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-extrabold rounded-2xl text-sm transition-all shadow-md shadow-blue-500/25 flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <ClipboardCheck className="w-5 h-5" />
-              {attProcessing ? "Processing Attendance..." : `Mark Attendance for ${attSelectedStudents.length} Student(s)`}
-            </button>
+                {/* Step 3: Submit */}
+                <button
+                  onClick={handleAdminMarkAttendance}
+                  disabled={attProcessing || attSelectedStudents.length === 0 || !attForm.subjectCode}
+                  className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-700 hover:to-sky-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-extrabold rounded-2xl text-sm transition-all shadow-md shadow-blue-500/25 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <ClipboardCheck className="w-5 h-5" />
+                  {attProcessing ? "Processing Attendance..." : `Mark Attendance for ${attSelectedStudents.length} Student(s)`}
+                </button>
+              </div>
+            )}
+
           </div>
         )}
 

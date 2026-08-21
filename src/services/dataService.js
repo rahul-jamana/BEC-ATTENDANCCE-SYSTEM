@@ -1061,6 +1061,159 @@ export const DataService = {
     return { session: newSession, records: newRecords, count: newRecords.length };
   },
 
+  // --- ADMIN MEDICAL / SPECIAL OVERRIDE (BOOST TO 75%+) ---
+  async adminBoostAttendanceToTarget({ studentId, targetPercentage = 75, reason = "Medical Grounds / Approved Exemption", adminName = "System Administrator" }) {
+    const student = await this.getUserById(studentId);
+    if (!student) throw new Error("Student not found!");
+
+    const allSessions = await this.getSessions();
+    const allAttendance = await this.getAttendance();
+    const allSubjects = await this.getSubjects();
+
+    // Relevant subjects for student's branch & semester
+    const branchSubjects = allSubjects.filter(
+      s => s.branch === student.branch && (s.semester === student.semester || !s.semester)
+    );
+
+    const updatedRecords = [...allAttendance];
+    const newAddedRecords = [];
+    const subjectsBoosted = [];
+
+    for (const sub of branchSubjects) {
+      // Find all sessions held for this student's class and subject
+      const subjectSessions = allSessions.filter(
+        sess =>
+          sess.branch === student.branch &&
+          sess.year === student.year &&
+          sess.section === student.section &&
+          sess.subjectId === sub.id
+      );
+
+      const totalClasses = subjectSessions.length;
+      if (totalClasses === 0) continue;
+
+      // Attended sessions
+      const attendedSessionIds = new Set(
+        updatedRecords
+          .filter(att => att.studentId === student.uid && att.subjectId === sub.id)
+          .map(att => att.sessionId)
+      );
+
+      const currentCount = attendedSessionIds.size;
+      const targetCount = Math.min(totalClasses, Math.ceil(totalClasses * (targetPercentage / 100)));
+
+      if (currentCount < targetCount) {
+        const needed = targetCount - currentCount;
+        let addedForThisSub = 0;
+
+        // 1. First find existing class sessions the student missed
+        const missedSessions = subjectSessions.filter(s => !attendedSessionIds.has(s.id));
+
+        for (let i = 0; i < needed && i < missedSessions.length; i++) {
+          const sess = missedSessions[i];
+          const docId = `${sess.id}_${student.uid}`;
+          const record = {
+            id: docId,
+            sessionId: sess.id,
+            studentId: student.uid,
+            studentName: student.name,
+            rollNo: student.rollNo,
+            branch: student.branch,
+            year: student.year,
+            section: student.section,
+            semester: student.semester || sub.semester,
+            subjectId: sub.id,
+            subjectName: sub.name,
+            markedAt: new Date().toISOString(),
+            status: "present",
+            markedByAdmin: true,
+            reason: reason,
+            medicalExemption: true
+          };
+
+          if (isLiveFirebaseConfigured && db) {
+            try { await setDoc(doc(db, "attendance", docId), record); } catch (e) {}
+          }
+          updatedRecords.push(record);
+          newAddedRecords.push(record);
+          addedForThisSub++;
+        }
+
+        // 2. If still needed, create virtual compensatory exemption records
+        while (addedForThisSub < needed) {
+          const virtualSessionId = `med_sess_${sub.id}_${Date.now()}_${addedForThisSub}`;
+          const virtualSession = {
+            id: virtualSessionId,
+            branch: student.branch,
+            year: student.year,
+            section: student.section,
+            semester: student.semester || sub.semester,
+            subjectId: sub.id,
+            subjectName: sub.name,
+            teacherId: "admin",
+            teacherName: adminName,
+            token: "medical_direct",
+            tokenGeneratedAt: Date.now(),
+            isActive: false,
+            createdAt: new Date().toISOString(),
+            markedByAdmin: true,
+            isCompensatory: true
+          };
+
+          if (isLiveFirebaseConfigured && db) {
+            try { await setDoc(doc(db, "sessions", virtualSessionId), virtualSession); } catch (e) {}
+          }
+          allSessions.push(virtualSession);
+
+          const docId = `${virtualSessionId}_${student.uid}`;
+          const record = {
+            id: docId,
+            sessionId: virtualSessionId,
+            studentId: student.uid,
+            studentName: student.name,
+            rollNo: student.rollNo,
+            branch: student.branch,
+            year: student.year,
+            section: student.section,
+            semester: student.semester || sub.semester,
+            subjectId: sub.id,
+            subjectName: sub.name,
+            markedAt: new Date().toISOString(),
+            status: "present",
+            markedByAdmin: true,
+            reason: reason,
+            medicalExemption: true
+          };
+
+          if (isLiveFirebaseConfigured && db) {
+            try { await setDoc(doc(db, "attendance", docId), record); } catch (e) {}
+          }
+          updatedRecords.push(record);
+          newAddedRecords.push(record);
+          addedForThisSub++;
+        }
+
+        subjectsBoosted.push({
+          subjectName: sub.name,
+          beforePct: Math.round((currentCount / totalClasses) * 100),
+          afterPct: Math.round((targetCount / totalClasses) * 100),
+          addedClasses: addedForThisSub
+        });
+      }
+    }
+
+    localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(allSessions));
+    localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(updatedRecords));
+
+    return {
+      studentName: student.name,
+      rollNo: student.rollNo,
+      targetPercentage,
+      totalRecordsAdded: newAddedRecords.length,
+      subjectsBoosted
+    };
+  },
+
   // --- BPUT CURRICULUM HELPERS ---
   getBputCurriculum() {
     return BPUT_CURRICULUM;
