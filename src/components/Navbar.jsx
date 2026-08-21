@@ -36,9 +36,11 @@ export const Navbar = () => {
         <div className="flex items-center justify-between h-16">
           {/* Logo & College Brand */}
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl gradient-blue-bg flex items-center justify-center text-white font-bold shadow-md shadow-blue-500/20">
-              <QrCode className="w-6 h-6 text-white" />
-            </div>
+            <img 
+              src="/bec-logo.png" 
+              alt="Bhubaneswar Engineering College Logo" 
+              className="w-10 h-10 object-contain rounded-lg drop-shadow-sm hover:scale-105 transition-transform" 
+            />
             <div>
               <span className="text-lg font-extrabold text-slate-900 tracking-tight block leading-none">
                 BEC ATTENDANCE

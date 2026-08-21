@@ -6,10 +6,12 @@ export const PendingNotice = () => {
   const { userProfile, logout, refreshProfile } = useAuth();
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-3xl p-8 shadow-2xl border border-slate-100 text-center space-y-6">
-        <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
-          <Clock className="w-8 h-8 animate-pulse" />
+    <div className="min-h-screen bg-gradient-to-br from-blue-200 via-sky-100 to-blue-100 flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-white rounded-3xl p-8 shadow-2xl border border-blue-200/80 text-center space-y-6">
+        <img src="/bec-logo.png" alt="Bhubaneswar Engineering College Logo" className="w-16 h-16 object-contain mx-auto drop-shadow-md" />
+
+        <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
+          <Clock className="w-6 h-6 animate-pulse" />
         </div>
 
         <div className="space-y-2">

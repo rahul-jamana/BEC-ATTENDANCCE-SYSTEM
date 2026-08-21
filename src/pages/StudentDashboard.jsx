@@ -10,6 +10,7 @@ import {
 export const StudentDashboard = () => {
   const { userProfile, refreshProfile } = useAuth();
   const [stats, setStats] = useState([]);
+  const [attendanceLogs, setAttendanceLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
 
@@ -19,6 +20,12 @@ export const StudentDashboard = () => {
     try {
       const data = await DataService.getStudentSubjectStats(userProfile);
       setStats(data);
+
+      const allAttendance = await DataService.getAttendance();
+      const studentLogs = allAttendance
+        .filter(a => a.studentId === userProfile.uid || a.rollNo === userProfile.rollNo)
+        .sort((a, b) => new Date(b.markedAt) - new Date(a.markedAt));
+      setAttendanceLogs(studentLogs);
     } catch (e) {
       console.error("Failed to load subject statistics:", e);
     } finally {
@@ -30,7 +37,13 @@ export const StudentDashboard = () => {
     fetchStudentStats();
   }, [userProfile]);
 
-  const hasLowAttendance = stats.some(s => s.isWarning);
+  // Total Cumulative Attendance Calculations
+  const totalAttended = stats.reduce((acc, curr) => acc + (curr.attendedClasses || 0), 0);
+  const totalClasses = stats.reduce((acc, curr) => acc + (curr.totalClasses || 0), 0);
+  const overallPercentage = totalClasses > 0 ? Math.round((totalAttended / totalClasses) * 100) : 100;
+  const isOverallWarning = overallPercentage < 75;
+  const atRiskCount = stats.filter(s => s.isWarning).length;
+  const goodStandingCount = stats.filter(s => !s.isWarning).length;
 
   return (
     <div className="min-h-screen bg-slate-50 pb-12">
@@ -71,16 +84,106 @@ export const StudentDashboard = () => {
           </div>
         </div>
 
+        {/* --- OVERALL TOTAL ATTENDANCE METRICS BAR --- */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          
+          {/* Overall Attendance % Metric Card */}
+          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm relative overflow-hidden flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                Overall Total Attendance
+              </span>
+              <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                <Award className="w-5 h-5" />
+              </div>
+            </div>
+            
+            <div className="my-4 flex items-baseline space-x-3">
+              <span className={`text-4xl sm:text-5xl font-extrabold tracking-tight ${isOverallWarning ? 'text-red-600' : 'text-slate-900'}`}>
+                {overallPercentage}%
+              </span>
+              <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${isOverallWarning ? 'bg-red-50 text-red-700 border-red-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+                {isOverallWarning ? '⚠️ Below 75%' : '✅ Good Standing'}
+              </span>
+            </div>
+
+            <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden mb-3">
+              <div 
+                className={`h-full transition-all duration-1000 ${isOverallWarning ? 'bg-red-500' : 'bg-blue-600'}`} 
+                style={{ width: `${Math.min(overallPercentage, 100)}%` }}
+              ></div>
+            </div>
+
+            <div className="text-xs text-slate-500 font-medium">
+              Institutional Status: <span className="font-bold text-slate-800">{isOverallWarning ? "Restricted Exam Risk" : "Eligible for Examinations"}</span>
+            </div>
+          </div>
+
+          {/* Total Classes Attended Metric Card */}
+          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                Total Classes Attended
+              </span>
+              <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+            </div>
+
+            <div className="my-4">
+              <div className="text-3xl font-extrabold text-slate-900">
+                {totalAttended} <span className="text-base text-slate-400 font-normal">/ {totalClasses} classes</span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                Total lectures attended across all {stats.length} enrolled subjects.
+              </p>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600 font-medium">
+              <span>Section: {userProfile?.branch}-{userProfile?.section}</span>
+              <span className="font-mono text-blue-600 font-bold">Sem {userProfile?.semester}</span>
+            </div>
+          </div>
+
+          {/* Subject Health Summary Card */}
+          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                Subject Health Breakdown
+              </span>
+              <div className="w-10 h-10 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                <BarChart3 className="w-5 h-5" />
+              </div>
+            </div>
+
+            <div className="my-4 grid grid-cols-2 gap-3 text-center">
+              <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-2xl">
+                <span className="text-2xl font-bold text-emerald-700 block">{goodStandingCount}</span>
+                <span className="text-[11px] font-semibold text-emerald-800 uppercase tracking-wider">Good (&ge;75%)</span>
+              </div>
+              <div className="p-3 bg-red-50 border border-red-100 rounded-2xl">
+                <span className="text-2xl font-bold text-red-700 block">{atRiskCount}</span>
+                <span className="text-[11px] font-semibold text-red-800 uppercase tracking-wider">Shortage (&lt;75%)</span>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 text-xs text-slate-500">
+              {atRiskCount > 0 ? `⚠️ Action needed: ${atRiskCount} subject(s) below threshold` : `✨ Great job! All ${stats.length} subjects above 75%`}
+            </div>
+          </div>
+
+        </div>
+
         {/* Low Attendance Warning Alert (<75%) */}
-        {hasLowAttendance && (
+        {isOverallWarning && (
           <div className="bg-red-50 border-2 border-red-300 rounded-2xl p-5 shadow-sm flex items-start space-x-4 animate-in fade-in">
             <div className="p-3 bg-red-100 text-red-600 rounded-xl">
               <AlertTriangle className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-red-900">⚠️ Low Attendance Warning (&lt;75%)</h3>
+              <h3 className="text-base font-bold text-red-900">⚠️ Mandatory Attendance Shortage Warning (&lt;75%)</h3>
               <p className="text-xs text-red-700 mt-1 leading-relaxed">
-                Your attendance in one or more subjects is currently below the mandatory <strong>75% institutional threshold</strong>. Please scan class QR codes regularly to avoid exam eligibility restriction.
+                Your overall cumulative attendance is <strong>{overallPercentage}%</strong>, which is below the mandatory <strong>75% institutional requirement</strong> for Bhubaneswar Engineering College. Scan QR codes regularly during scheduled lectures to restore your eligibility.
               </p>
             </div>
           </div>
@@ -95,7 +198,7 @@ export const StudentDashboard = () => {
 
           <button
             onClick={fetchStudentStats}
-            className="p-2 text-slate-600 hover:text-blue-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl transition-colors text-xs font-semibold flex items-center space-x-1"
+            className="p-2 text-slate-600 hover:text-blue-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl transition-colors text-xs font-semibold flex items-center space-x-1 cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
             <span>Refresh Stats</span>
@@ -171,6 +274,61 @@ export const StudentDashboard = () => {
             ))}
           </div>
         )}
+
+        {/* --- RECENT SCANNED ATTENDANCE LOG TIMELINE --- */}
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-extrabold text-slate-900">Recent Attendance Activity Log</h2>
+              <p className="text-xs text-slate-500">Verified QR code scan records for {userProfile?.name}</p>
+            </div>
+            <span className="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-xs font-semibold">
+              Total Recorded Scans: {attendanceLogs.length}
+            </span>
+          </div>
+
+          {attendanceLogs.length === 0 ? (
+            <div className="text-center py-8 text-slate-500 text-xs font-medium">
+              No QR scans recorded yet. Click "Scan QR Code" above during class to mark attendance!
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 text-slate-400 text-[11px] uppercase tracking-wider font-semibold bg-slate-50">
+                    <th className="py-3 px-4 rounded-l-xl">Subject</th>
+                    <th className="py-3 px-4">Date & Time</th>
+                    <th className="py-3 px-4">Class Target</th>
+                    <th className="py-3 px-4 rounded-r-xl text-right">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs">
+                  {attendanceLogs.slice(0, 10).map((log) => (
+                    <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-3 px-4 font-bold text-slate-800">
+                        {log.subjectName || "DBMS"}
+                      </td>
+                      <td className="py-3 px-4 text-slate-600 font-mono text-[11px]">
+                        {new Date(log.markedAt).toLocaleString('en-IN', {
+                          dateStyle: 'medium',
+                          timeStyle: 'short'
+                        })}
+                      </td>
+                      <td className="py-3 px-4 text-slate-500">
+                        {log.branch} - {log.year} Yr (Sec {log.section})
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full font-semibold text-[11px]">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Present
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
 
       </div>
 

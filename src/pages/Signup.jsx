@@ -46,14 +46,12 @@ export const Signup = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 sm:p-6 lg:p-8">
-      <div className="max-w-xl w-full bg-white rounded-3xl shadow-2xl border border-slate-100 p-8 sm:p-10">
+    <div className="min-h-screen bg-gradient-to-br from-blue-200 via-sky-100 to-blue-100 flex items-center justify-center p-4 sm:p-6 lg:p-8">
+      <div className="max-w-xl w-full bg-white rounded-3xl shadow-2xl border border-blue-200/80 p-8 sm:p-10">
         
         {/* Header */}
         <div className="flex items-center space-x-3 mb-6">
-          <div className="w-10 h-10 rounded-xl gradient-blue-bg flex items-center justify-center text-white font-bold">
-            <QrCode className="w-6 h-6" />
-          </div>
+          <img src="/bec-logo.png" alt="Bhubaneswar Engineering College Logo" className="w-11 h-11 object-contain drop-shadow-sm" />
           <div>
             <h2 className="text-2xl font-bold text-slate-900">Student Self Registration</h2>
             <p className="text-xs text-slate-500">Fill in your academic profile for BEC Attendance portal</p>

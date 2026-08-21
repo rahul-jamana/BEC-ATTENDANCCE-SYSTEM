@@ -3,10 +3,27 @@
 @layer base {
   body {
     font-family: 'Inter', sans-serif;
+    overflow-x: hidden;
   }
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Poppins', sans-serif;
   }
+}
+
+/* Custom Sleek Scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.6);
 }
 
 /* Custom Palette Utility Variables */
