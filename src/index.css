@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'Inter', sans-serif;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Poppins', sans-serif;
+  }
+}
+
+/* Custom Palette Utility Variables */
+:root {
+  --primary-blue: #1565C0;
+  --sky-blue: #42A5F5;
+  --sky-blue-light: #E3F2FD;
+}
+
+/* Custom Glassmorphism Card Styles */
+.glass-card {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.glass-card-dark {
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.gradient-blue-bg {
+  background: linear-gradient(135deg, #0D47A1 0%, #1565C0 50%, #42A5F5 100%);
+}
+
+.gradient-header {
+  background: linear-gradient(90deg, #1565C0 0%, #1E88E5 100%);
+}
+
+/* Custom pulse glow animation for live QR code indicator */
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(66, 165, 245, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(21, 101, 192, 0.9);
+  }
+}
+
+.pulse-glow {
+  animation: pulseGlow 2s infinite ease-in-out;
+}
