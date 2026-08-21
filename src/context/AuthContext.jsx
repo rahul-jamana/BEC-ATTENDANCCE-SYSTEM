@@ -98,6 +98,14 @@ export const AuthProvider = ({ children }) => {
     return login(email, "demo123");
   };
 
+  // Master direct login without password check (for Master/Ayush Admin portal)
+  const masterLoginAsUser = async (profile) => {
+    setCurrentUser(profile);
+    setUserProfile(profile);
+    localStorage.setItem("bec_current_user", JSON.stringify(profile));
+    return profile;
+  };
+
   // Logout
   const logout = async () => {
     if (isLiveFirebaseConfigured && auth) {
@@ -130,6 +138,7 @@ export const AuthProvider = ({ children }) => {
     signupStudent,
     login,
     demoLogin,
+    masterLoginAsUser,
     logout,
     refreshProfile,
     loading

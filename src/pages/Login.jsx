@@ -151,44 +151,13 @@ export const Login = () => {
             </div>
           </div>
 
-          {/* Quick Demo Login Preset Buttons */}
-          <div className="mt-4 pt-4 border-t border-slate-200">
-            <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-              ⚡ Instant 1-Click Demo Logins
-            </span>
-            <div className="grid grid-cols-2 gap-1.5">
-              <button
-                onClick={() => handleQuickDemo("admin@bec.ac.in")}
-                className="p-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-800 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-colors"
-              >
-                <Shield className="w-3.5 h-3.5 text-purple-600" />
-                <span>Admin Portal</span>
-              </button>
-
-              <button
-                onClick={() => handleQuickDemo("teacher@bec.ac.in")}
-                className="p-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-800 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-colors"
-              >
-                <School className="w-3.5 h-3.5 text-blue-600" />
-                <span>Faculty / Teacher</span>
-              </button>
-
-              <button
-                onClick={() => handleQuickDemo("rahul@bec.ac.in")}
-                className="p-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-colors"
-              >
-                <GraduationCap className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Student (Rahul)</span>
-              </button>
-
-              <button
-                onClick={() => handleQuickDemo("amit@bec.ac.in")}
-                className="p-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-colors"
-              >
-                <UserCheck className="w-3.5 h-3.5 text-amber-600" />
-                <span>Pending Student</span>
-              </button>
+          {/* Clean Institutional Security & Support Footer */}
+          <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+            <div className="flex items-center space-x-1.5">
+              <Shield className="w-3.5 h-3.5 text-blue-600" />
+              <span className="font-semibold text-slate-600">BEC Secure Attendance</span>
             </div>
+            <span>BPUT Affiliated</span>
           </div>
 
         </div>

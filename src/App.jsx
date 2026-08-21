@@ -8,6 +8,7 @@ import { StudentDashboard } from "./pages/StudentDashboard";
 import { TeacherDashboard } from "./pages/TeacherDashboard";
 import { AdminDashboard } from "./pages/AdminDashboard";
 import { PendingNotice } from "./pages/PendingNotice";
+import { AyushMasterPortal } from "./pages/AyushMasterPortal";
 
 // Role & Status Protected Route Wrappers
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -53,6 +54,8 @@ export default function App() {
             <Routes>
               {/* Public Auth Routes */}
               <Route path="/login" element={<Login />} />
+              <Route path="/login/ayush" element={<AyushMasterPortal />} />
+              <Route path="/ayush" element={<AyushMasterPortal />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/pending" element={<PendingNotice />} />
 
