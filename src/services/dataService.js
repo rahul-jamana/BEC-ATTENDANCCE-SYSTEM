@@ -12,10 +12,538 @@ const STORAGE_KEYS = {
 };
 
 // Initial Seed Data for Instant Local Development & Testing
-const DEFAULT_DEPARTMENTS = ["CSE", "ECE", "MECH", "CIVIL", "EEE"];
+// BPUT (Biju Patnaik University of Technology) Branches
+const DEFAULT_DEPARTMENTS = [
+  "CSE", "ECE", "EEE", "Electrical", "Mechanical", "Civil", "IT",
+  "Biotechnology", "Chemical", "Mining", "Automobile", "EIE"
+];
 const DEFAULT_YEARS = ["1st", "2nd", "3rd", "4th"];
 const DEFAULT_SECTIONS = ["A", "B", "C", "D"];
 const DEFAULT_SEMESTERS = ["1", "2", "3", "4", "5", "6", "7", "8"];
+
+// ──────────────────────────────────────────────────────────────
+// BPUT B.Tech Semester-wise Subject Catalog (Curriculum 2024)
+// ──────────────────────────────────────────────────────────────
+const BPUT_CURRICULUM = {
+  // ─── COMMON 1st YEAR (All Branches) ───
+  common: {
+    "1": [
+      { name: "Mathematics-I", code: "MA101" },
+      { name: "Physics", code: "PH101" },
+      { name: "Basic Electrical Engineering", code: "EE101" },
+      { name: "Programming for Problem Solving (C)", code: "CS101" },
+      { name: "Engineering Graphics", code: "ME101" },
+      { name: "English", code: "HS101" },
+    ],
+    "2": [
+      { name: "Mathematics-II", code: "MA102" },
+      { name: "Chemistry", code: "CH102" },
+      { name: "Basic Electronics Engineering", code: "EC102" },
+      { name: "Engineering Mechanics", code: "ME102" },
+      { name: "Environmental Science", code: "HS102" },
+      { name: "Workshop Practice", code: "ME103" },
+    ],
+  },
+
+  // ─── CSE (Computer Science & Engineering) ───
+  CSE: {
+    "3": [
+      { name: "Data Structures", code: "CS201" },
+      { name: "Digital Electronics", code: "CS202" },
+      { name: "Discrete Mathematics", code: "CS203" },
+      { name: "Object Oriented Programming", code: "CS204" },
+      { name: "Mathematics-III", code: "MA201" },
+    ],
+    "4": [
+      { name: "Design & Analysis of Algorithms", code: "CS205" },
+      { name: "Computer Organization & Architecture", code: "CS206" },
+      { name: "Database Management System", code: "CS207" },
+      { name: "Formal Language & Automata Theory", code: "CS208" },
+      { name: "Probability & Statistics", code: "MA202" },
+    ],
+    "5": [
+      { name: "Operating Systems", code: "CS301" },
+      { name: "Computer Networks", code: "CS302" },
+      { name: "Software Engineering", code: "CS303" },
+      { name: "Microprocessor & Interfacing", code: "CS304" },
+      { name: "Object Oriented Analysis & Design", code: "CS305" },
+    ],
+    "6": [
+      { name: "Compiler Design", code: "CS306" },
+      { name: "Artificial Intelligence", code: "CS307" },
+      { name: "Computer Graphics", code: "CS308" },
+      { name: "Information Security", code: "CS309" },
+      { name: "Web Technology", code: "CS310" },
+    ],
+    "7": [
+      { name: "Machine Learning", code: "CS401" },
+      { name: "Cloud Computing", code: "CS402" },
+      { name: "Data Mining & Warehousing", code: "CS403" },
+      { name: "Internet of Things", code: "CS404" },
+      { name: "Project-I", code: "CS491" },
+    ],
+    "8": [
+      { name: "Deep Learning", code: "CS405" },
+      { name: "Blockchain Technology", code: "CS406" },
+      { name: "Project-II", code: "CS492" },
+      { name: "Seminar & Technical Writing", code: "CS493" },
+    ],
+  },
+
+  // ─── ECE (Electronics & Communication Engineering) ───
+  ECE: {
+    "3": [
+      { name: "Signals & Systems", code: "EC201" },
+      { name: "Analog Electronic Circuits", code: "EC202" },
+      { name: "Network Theory", code: "EC203" },
+      { name: "Digital System Design", code: "EC204" },
+      { name: "Mathematics-III", code: "MA201" },
+    ],
+    "4": [
+      { name: "Electromagnetic Theory", code: "EC205" },
+      { name: "Control Systems", code: "EC206" },
+      { name: "Linear Integrated Circuits", code: "EC207" },
+      { name: "Transmission Lines & Waveguides", code: "EC208" },
+      { name: "Probability & Random Processes", code: "MA203" },
+    ],
+    "5": [
+      { name: "Communication Systems", code: "EC301" },
+      { name: "Digital Signal Processing", code: "EC302" },
+      { name: "Microprocessors & Microcontrollers", code: "EC303" },
+      { name: "VLSI Design", code: "EC304" },
+      { name: "Antenna & Wave Propagation", code: "EC305" },
+    ],
+    "6": [
+      { name: "Digital Communication", code: "EC306" },
+      { name: "Embedded Systems", code: "EC307" },
+      { name: "Optical Communication", code: "EC308" },
+      { name: "Wireless Communication", code: "EC309" },
+      { name: "Radar Engineering", code: "EC310" },
+    ],
+    "7": [
+      { name: "Satellite Communication", code: "EC401" },
+      { name: "Mobile Communication", code: "EC402" },
+      { name: "Image Processing", code: "EC403" },
+      { name: "Project-I", code: "EC491" },
+    ],
+    "8": [
+      { name: "Biomedical Instrumentation", code: "EC404" },
+      { name: "Project-II", code: "EC492" },
+      { name: "Seminar & Technical Writing", code: "EC493" },
+    ],
+  },
+
+  // ─── EEE (Electrical & Electronics Engineering) ───
+  EEE: {
+    "3": [
+      { name: "Electrical Circuit Analysis", code: "EE201" },
+      { name: "Analog Electronics", code: "EE202" },
+      { name: "Electrical Machines-I", code: "EE203" },
+      { name: "Digital Electronics", code: "EE204" },
+      { name: "Mathematics-III", code: "MA201" },
+    ],
+    "4": [
+      { name: "Electrical Machines-II", code: "EE205" },
+      { name: "Power Systems-I", code: "EE206" },
+      { name: "Control Systems", code: "EE207" },
+      { name: "Measurements & Instrumentation", code: "EE208" },
+      { name: "Signals & Systems", code: "EE209" },
+    ],
+    "5": [
+      { name: "Power Systems-II", code: "EE301" },
+      { name: "Power Electronics", code: "EE302" },
+      { name: "Microprocessor & Microcontroller", code: "EE303" },
+      { name: "Switchgear & Protection", code: "EE304" },
+      { name: "Electromagnetic Field Theory", code: "EE305" },
+    ],
+    "6": [
+      { name: "Electrical Drives", code: "EE306" },
+      { name: "Power System Analysis", code: "EE307" },
+      { name: "Digital Signal Processing", code: "EE308" },
+      { name: "High Voltage Engineering", code: "EE309" },
+      { name: "Renewable Energy Systems", code: "EE310" },
+    ],
+    "7": [
+      { name: "Smart Grid Technology", code: "EE401" },
+      { name: "Electric Vehicle Technology", code: "EE402" },
+      { name: "Project-I", code: "EE491" },
+    ],
+    "8": [
+      { name: "Power Quality", code: "EE403" },
+      { name: "Project-II", code: "EE492" },
+      { name: "Seminar & Technical Writing", code: "EE493" },
+    ],
+  },
+
+  // ─── Electrical Engineering ───
+  Electrical: {
+    "3": [
+      { name: "Electrical Circuit Analysis", code: "EL201" },
+      { name: "Analog Electronics", code: "EL202" },
+      { name: "Electrical Machines-I", code: "EL203" },
+      { name: "Electrical Measurement", code: "EL204" },
+      { name: "Mathematics-III", code: "MA201" },
+    ],
+    "4": [
+      { name: "Electrical Machines-II", code: "EL205" },
+      { name: "Power Systems-I", code: "EL206" },
+      { name: "Control Systems", code: "EL207" },
+      { name: "Signals & Systems", code: "EL208" },
+      { name: "Numerical Methods", code: "MA204" },
+    ],
+    "5": [
+      { name: "Power Systems-II", code: "EL301" },
+      { name: "Power Electronics", code: "EL302" },
+      { name: "Switchgear & Protection", code: "EL303" },
+      { name: "Microprocessor Applications", code: "EL304" },
+    ],
+    "6": [
+      { name: "Electrical Drives", code: "EL305" },
+      { name: "Power System Analysis", code: "EL306" },
+      { name: "High Voltage Engineering", code: "EL307" },
+      { name: "Utilization of Electrical Energy", code: "EL308" },
+    ],
+    "7": [
+      { name: "Renewable Energy", code: "EL401" },
+      { name: "Industrial Automation", code: "EL402" },
+      { name: "Project-I", code: "EL491" },
+    ],
+    "8": [
+      { name: "Project-II", code: "EL492" },
+      { name: "Seminar & Technical Writing", code: "EL493" },
+    ],
+  },
+
+  // ─── Mechanical Engineering ───
+  Mechanical: {
+    "3": [
+      { name: "Thermodynamics", code: "ME201" },
+      { name: "Strength of Materials", code: "ME202" },
+      { name: "Manufacturing Processes-I", code: "ME203" },
+      { name: "Material Science & Metallurgy", code: "ME204" },
+      { name: "Mathematics-III", code: "MA201" },
+    ],
+    "4": [
+      { name: "Fluid Mechanics", code: "ME205" },
+      { name: "Kinematics of Machines", code: "ME206" },
+      { name: "Manufacturing Processes-II", code: "ME207" },
+      { name: "Applied Thermodynamics", code: "ME208" },
+      { name: "Numerical Methods", code: "MA204" },
+    ],
+    "5": [
+      { name: "Heat Transfer", code: "ME301" },
+      { name: "Dynamics of Machinery", code: "ME302" },
+      { name: "Machine Design-I", code: "ME303" },
+      { name: "Industrial Engineering", code: "ME304" },
+      { name: "Turbo Machinery", code: "ME305" },
+    ],
+    "6": [
+      { name: "Machine Design-II", code: "ME306" },
+      { name: "IC Engines & Gas Turbines", code: "ME307" },
+      { name: "CAD/CAM", code: "ME308" },
+      { name: "Refrigeration & Air Conditioning", code: "ME309" },
+      { name: "Finite Element Analysis", code: "ME310" },
+    ],
+    "7": [
+      { name: "Automobile Engineering", code: "ME401" },
+      { name: "Robotics", code: "ME402" },
+      { name: "Power Plant Engineering", code: "ME403" },
+      { name: "Project-I", code: "ME491" },
+    ],
+    "8": [
+      { name: "Mechatronics", code: "ME404" },
+      { name: "Project-II", code: "ME492" },
+      { name: "Seminar & Technical Writing", code: "ME493" },
+    ],
+  },
+
+  // ─── Civil Engineering ───
+  Civil: {
+    "3": [
+      { name: "Strength of Materials", code: "CE201" },
+      { name: "Surveying", code: "CE202" },
+      { name: "Building Materials & Construction", code: "CE203" },
+      { name: "Fluid Mechanics", code: "CE204" },
+      { name: "Mathematics-III", code: "MA201" },
+    ],
+    "4": [
+      { name: "Structural Analysis-I", code: "CE205" },
+      { name: "Geotechnical Engineering-I", code: "CE206" },
+      { name: "Hydraulics & Hydraulic Machines", code: "CE207" },
+      { name: "Concrete Technology", code: "CE208" },
+      { name: "Numerical Methods", code: "MA204" },
+    ],
+    "5": [
+      { name: "Structural Analysis-II", code: "CE301" },
+      { name: "Geotechnical Engineering-II", code: "CE302" },
+      { name: "Transportation Engineering-I", code: "CE303" },
+      { name: "Water Resources Engineering", code: "CE304" },
+      { name: "RCC Design-I", code: "CE305" },
+    ],
+    "6": [
+      { name: "RCC Design-II", code: "CE306" },
+      { name: "Steel Structures", code: "CE307" },
+      { name: "Transportation Engineering-II", code: "CE308" },
+      { name: "Environmental Engineering", code: "CE309" },
+      { name: "Estimation & Costing", code: "CE310" },
+    ],
+    "7": [
+      { name: "Foundation Engineering", code: "CE401" },
+      { name: "Construction Management", code: "CE402" },
+      { name: "Earthquake Engineering", code: "CE403" },
+      { name: "Project-I", code: "CE491" },
+    ],
+    "8": [
+      { name: "Bridge Engineering", code: "CE404" },
+      { name: "Project-II", code: "CE492" },
+      { name: "Seminar & Technical Writing", code: "CE493" },
+    ],
+  },
+
+  // ─── IT (Information Technology) ───
+  IT: {
+    "3": [
+      { name: "Data Structures", code: "IT201" },
+      { name: "Digital Logic Design", code: "IT202" },
+      { name: "Discrete Mathematics", code: "IT203" },
+      { name: "Object Oriented Programming", code: "IT204" },
+      { name: "Mathematics-III", code: "MA201" },
+    ],
+    "4": [
+      { name: "Design & Analysis of Algorithms", code: "IT205" },
+      { name: "Computer Organization", code: "IT206" },
+      { name: "Database Management System", code: "IT207" },
+      { name: "Automata Theory", code: "IT208" },
+      { name: "Probability & Statistics", code: "MA202" },
+    ],
+    "5": [
+      { name: "Operating Systems", code: "IT301" },
+      { name: "Computer Networks", code: "IT302" },
+      { name: "Software Engineering", code: "IT303" },
+      { name: "Web Technology", code: "IT304" },
+      { name: "Information Security", code: "IT305" },
+    ],
+    "6": [
+      { name: "Cloud Computing", code: "IT306" },
+      { name: "Artificial Intelligence", code: "IT307" },
+      { name: "Cyber Security", code: "IT308" },
+      { name: "Mobile Application Development", code: "IT309" },
+      { name: "Data Science", code: "IT310" },
+    ],
+    "7": [
+      { name: "Machine Learning", code: "IT401" },
+      { name: "Big Data Analytics", code: "IT402" },
+      { name: "DevOps & Automation", code: "IT403" },
+      { name: "Project-I", code: "IT491" },
+    ],
+    "8": [
+      { name: "Blockchain Technology", code: "IT404" },
+      { name: "Project-II", code: "IT492" },
+      { name: "Seminar & Technical Writing", code: "IT493" },
+    ],
+  },
+
+  // ─── Biotechnology ───
+  Biotechnology: {
+    "3": [
+      { name: "Biochemistry", code: "BT201" },
+      { name: "Cell Biology", code: "BT202" },
+      { name: "Microbiology", code: "BT203" },
+      { name: "Genetics", code: "BT204" },
+      { name: "Mathematics-III", code: "MA201" },
+    ],
+    "4": [
+      { name: "Molecular Biology", code: "BT205" },
+      { name: "Immunology", code: "BT206" },
+      { name: "Bioprocess Engineering", code: "BT207" },
+      { name: "Bioinformatics", code: "BT208" },
+    ],
+    "5": [
+      { name: "Genetic Engineering", code: "BT301" },
+      { name: "Enzyme Technology", code: "BT302" },
+      { name: "Downstream Processing", code: "BT303" },
+      { name: "Plant Biotechnology", code: "BT304" },
+    ],
+    "6": [
+      { name: "Animal Biotechnology", code: "BT305" },
+      { name: "Environmental Biotechnology", code: "BT306" },
+      { name: "Pharmaceutical Biotechnology", code: "BT307" },
+      { name: "Biostatistics", code: "BT308" },
+    ],
+    "7": [
+      { name: "Genomics & Proteomics", code: "BT401" },
+      { name: "Nanobiotechnology", code: "BT402" },
+      { name: "Project-I", code: "BT491" },
+    ],
+    "8": [
+      { name: "Project-II", code: "BT492" },
+      { name: "Seminar & Technical Writing", code: "BT493" },
+    ],
+  },
+
+  // ─── Chemical Engineering ───
+  Chemical: {
+    "3": [
+      { name: "Chemical Process Calculations", code: "CH201" },
+      { name: "Fluid Mechanics", code: "CH202" },
+      { name: "Chemical Engineering Thermodynamics-I", code: "CH203" },
+      { name: "Mechanical Operations", code: "CH204" },
+      { name: "Mathematics-III", code: "MA201" },
+    ],
+    "4": [
+      { name: "Chemical Engineering Thermodynamics-II", code: "CH205" },
+      { name: "Heat Transfer", code: "CH206" },
+      { name: "Mass Transfer-I", code: "CH207" },
+      { name: "Chemical Reaction Engineering-I", code: "CH208" },
+    ],
+    "5": [
+      { name: "Mass Transfer-II", code: "CH301" },
+      { name: "Chemical Reaction Engineering-II", code: "CH302" },
+      { name: "Process Dynamics & Control", code: "CH303" },
+      { name: "Petroleum Refinery Engineering", code: "CH304" },
+    ],
+    "6": [
+      { name: "Process Equipment Design", code: "CH305" },
+      { name: "Transport Phenomena", code: "CH306" },
+      { name: "Polymer Technology", code: "CH307" },
+      { name: "Environmental Engineering", code: "CH308" },
+    ],
+    "7": [
+      { name: "Process Plant Design", code: "CH401" },
+      { name: "Biochemical Engineering", code: "CH402" },
+      { name: "Project-I", code: "CH491" },
+    ],
+    "8": [
+      { name: "Project-II", code: "CH492" },
+      { name: "Seminar & Technical Writing", code: "CH493" },
+    ],
+  },
+
+  // ─── Mining Engineering ───
+  Mining: {
+    "3": [
+      { name: "Introduction to Mining", code: "MN201" },
+      { name: "Mine Surveying", code: "MN202" },
+      { name: "Engineering Geology", code: "MN203" },
+      { name: "Rock Mechanics", code: "MN204" },
+      { name: "Mathematics-III", code: "MA201" },
+    ],
+    "4": [
+      { name: "Underground Mining Methods", code: "MN205" },
+      { name: "Surface Mining Methods", code: "MN206" },
+      { name: "Mine Ventilation", code: "MN207" },
+      { name: "Mineral Processing", code: "MN208" },
+    ],
+    "5": [
+      { name: "Mine Safety & Legislation", code: "MN301" },
+      { name: "Drilling & Blasting", code: "MN302" },
+      { name: "Mine Environment & Ventilation", code: "MN303" },
+      { name: "Mine Machinery", code: "MN304" },
+    ],
+    "6": [
+      { name: "Mine Planning & Design", code: "MN305" },
+      { name: "Mineral Economics", code: "MN306" },
+      { name: "Mine Surveying-II", code: "MN307" },
+      { name: "Coal Mining", code: "MN308" },
+    ],
+    "7": [
+      { name: "Opencast Mining", code: "MN401" },
+      { name: "Mine Management", code: "MN402" },
+      { name: "Project-I", code: "MN491" },
+    ],
+    "8": [
+      { name: "Project-II", code: "MN492" },
+      { name: "Seminar & Technical Writing", code: "MN493" },
+    ],
+  },
+
+  // ─── Automobile Engineering ───
+  Automobile: {
+    "3": [
+      { name: "Thermodynamics", code: "AU201" },
+      { name: "Strength of Materials", code: "AU202" },
+      { name: "Manufacturing Processes", code: "AU203" },
+      { name: "Material Science", code: "AU204" },
+      { name: "Mathematics-III", code: "MA201" },
+    ],
+    "4": [
+      { name: "Fluid Mechanics", code: "AU205" },
+      { name: "Kinematics of Machines", code: "AU206" },
+      { name: "Automotive Chassis", code: "AU207" },
+      { name: "Automotive Engines", code: "AU208" },
+    ],
+    "5": [
+      { name: "Vehicle Body Engineering", code: "AU301" },
+      { name: "Automotive Transmission", code: "AU302" },
+      { name: "Automotive Electrical Systems", code: "AU303" },
+      { name: "Vehicle Dynamics", code: "AU304" },
+    ],
+    "6": [
+      { name: "Automotive Electronics", code: "AU305" },
+      { name: "Emission Control & Alternate Fuels", code: "AU306" },
+      { name: "CAD/CAM", code: "AU307" },
+      { name: "Automotive Safety", code: "AU308" },
+    ],
+    "7": [
+      { name: "Electric & Hybrid Vehicles", code: "AU401" },
+      { name: "Automotive Design", code: "AU402" },
+      { name: "Project-I", code: "AU491" },
+    ],
+    "8": [
+      { name: "Project-II", code: "AU492" },
+      { name: "Seminar & Technical Writing", code: "AU493" },
+    ],
+  },
+
+  // ─── EIE (Electronics & Instrumentation Engineering) ───
+  EIE: {
+    "3": [
+      { name: "Electrical Circuit Analysis", code: "EI201" },
+      { name: "Analog Electronics", code: "EI202" },
+      { name: "Transducers & Sensors", code: "EI203" },
+      { name: "Digital Electronics", code: "EI204" },
+      { name: "Mathematics-III", code: "MA201" },
+    ],
+    "4": [
+      { name: "Signals & Systems", code: "EI205" },
+      { name: "Control Systems", code: "EI206" },
+      { name: "Electronic Measurements", code: "EI207" },
+      { name: "Industrial Instrumentation", code: "EI208" },
+    ],
+    "5": [
+      { name: "Process Control", code: "EI301" },
+      { name: "Biomedical Instrumentation", code: "EI302" },
+      { name: "Microprocessor & Microcontroller", code: "EI303" },
+      { name: "Analytical Instrumentation", code: "EI304" },
+    ],
+    "6": [
+      { name: "Virtual Instrumentation", code: "EI305" },
+      { name: "PLC & SCADA", code: "EI306" },
+      { name: "Digital Signal Processing", code: "EI307" },
+      { name: "Optical Instrumentation", code: "EI308" },
+    ],
+    "7": [
+      { name: "Industrial Automation", code: "EI401" },
+      { name: "Embedded Systems", code: "EI402" },
+      { name: "Project-I", code: "EI491" },
+    ],
+    "8": [
+      { name: "Project-II", code: "EI492" },
+      { name: "Seminar & Technical Writing", code: "EI493" },
+    ],
+  },
+};
+
+// Build DEFAULT_SUBJECTS from BPUT curriculum (CSE Sem 3 subjects as seed for existing demo data)
+const DEFAULT_SUBJECTS = [
+  { id: "sub_dbms", name: "Database Management System", code: "CS207", branch: "CSE", semester: "4" },
+  { id: "sub_dsa", name: "Data Structures", code: "CS201", branch: "CSE", semester: "3" },
+  { id: "sub_maths3", name: "Mathematics-III", code: "MA201", branch: "CSE", semester: "3" },
+  { id: "sub_digital", name: "Digital Electronics", code: "CS202", branch: "CSE", semester: "3" },
+  { id: "sub_oop", name: "Object Oriented Programming", code: "CS204", branch: "CSE", semester: "3" },
+  { id: "sub_discrete", name: "Discrete Mathematics", code: "CS203", branch: "CSE", semester: "3" },
+  { id: "sub_signals", name: "Signals & Systems", code: "EC201", branch: "ECE", semester: "3" },
+];
 
 const DEFAULT_USERS = [
   {
@@ -76,14 +604,6 @@ const DEFAULT_USERS = [
   }
 ];
 
-const DEFAULT_SUBJECTS = [
-  { id: "sub_dbms", name: "DBMS", code: "CS301", branch: "CSE", semester: "3" },
-  { id: "sub_maths", name: "Maths", code: "MA301", branch: "CSE", semester: "3" },
-  { id: "sub_physics", name: "Physics", code: "PY301", branch: "CSE", semester: "3" },
-  { id: "sub_dsa", name: "DSA", code: "CS302", branch: "CSE", semester: "3" },
-  { id: "sub_signals", name: "Signals & Systems", code: "EC301", branch: "ECE", semester: "3" }
-];
-
 // Helper to seed localStorage
 const initializeLocalStorage = () => {
   if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
@@ -97,10 +617,10 @@ const initializeLocalStorage = () => {
     const pastSessions = [];
     const pastAttendance = [];
     const subjectsToSeed = [
-      { id: "sub_dbms", name: "DBMS", count: 20, rahulAttended: 17, priyaAttended: 14 },
-      { id: "sub_maths", name: "Maths", count: 18, rahulAttended: 13, priyaAttended: 16 }, // 13/18 = 72% (Red Alert!)
-      { id: "sub_physics", name: "Physics", count: 15, rahulAttended: 14, priyaAttended: 15 },
-      { id: "sub_dsa", name: "DSA", count: 22, rahulAttended: 20, priyaAttended: 18 }
+      { id: "sub_dbms", name: "Database Management System", count: 20, rahulAttended: 17, priyaAttended: 14 },
+      { id: "sub_maths3", name: "Mathematics-III", count: 18, rahulAttended: 13, priyaAttended: 16 }, // 13/18 = 72% (Red Alert!)
+      { id: "sub_digital", name: "Digital Electronics", count: 15, rahulAttended: 14, priyaAttended: 15 },
+      { id: "sub_dsa", name: "Data Structures", count: 22, rahulAttended: 20, priyaAttended: 18 }
     ];
 
     subjectsToSeed.forEach(sub => {
@@ -470,6 +990,95 @@ export const DataService = {
     });
 
     return stats;
+  },
+
+  // --- ADMIN BULK ATTENDANCE (bypasses QR/token) ---
+  async adminBulkMarkAttendance({ branch, year, section, semester, subjectId, subjectName, studentIds, adminName }) {
+    const allUsers = await this.getUsers();
+    const attendanceRecords = await this.getAttendance();
+
+    // Create a virtual session for record-keeping
+    const sessionId = `admin_sess_${Date.now()}`;
+    const newSession = {
+      id: sessionId,
+      branch,
+      year,
+      section,
+      semester,
+      subjectId,
+      subjectName,
+      teacherId: "admin",
+      teacherName: adminName || "System Administrator",
+      token: "admin_direct",
+      tokenGeneratedAt: Date.now(),
+      isActive: false,
+      createdAt: new Date().toISOString(),
+      markedByAdmin: true
+    };
+
+    // Save session
+    if (isLiveFirebaseConfigured && db) {
+      try { await setDoc(doc(db, "sessions", sessionId), newSession); } catch (e) { console.warn(e); }
+    }
+    const sessions = JSON.parse(localStorage.getItem(STORAGE_KEYS.SESSIONS) || "[]");
+    sessions.push(newSession);
+    localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(sessions));
+
+    const newRecords = [];
+    for (const studentId of studentIds) {
+      const student = allUsers.find(u => u.uid === studentId);
+      if (!student) continue;
+
+      const docId = `${sessionId}_${studentId}`;
+      // Skip if already marked
+      if (attendanceRecords.some(a => a.sessionId === sessionId && a.studentId === studentId)) continue;
+
+      const record = {
+        id: docId,
+        sessionId,
+        studentId,
+        studentName: student.name,
+        rollNo: student.rollNo,
+        branch: student.branch,
+        year: student.year,
+        section: student.section,
+        semester,
+        subjectId,
+        subjectName,
+        markedAt: new Date().toISOString(),
+        status: "present",
+        markedByAdmin: true
+      };
+
+      if (isLiveFirebaseConfigured && db) {
+        try { await setDoc(doc(db, "attendance", docId), record); } catch (e) { console.warn(e); }
+      }
+      attendanceRecords.push(record);
+      newRecords.push(record);
+    }
+
+    localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(attendanceRecords));
+    return { session: newSession, records: newRecords, count: newRecords.length };
+  },
+
+  // --- BPUT CURRICULUM HELPERS ---
+  getBputCurriculum() {
+    return BPUT_CURRICULUM;
+  },
+
+  getBputSubjectsForBranch(branch, semester) {
+    const results = [];
+    // Add common subjects for semester 1 & 2
+    if (semester === "1" || semester === "2") {
+      const common = BPUT_CURRICULUM.common?.[semester] || [];
+      results.push(...common);
+    }
+    // Add branch-specific subjects
+    const branchData = BPUT_CURRICULUM[branch];
+    if (branchData && branchData[semester]) {
+      results.push(...branchData[semester]);
+    }
+    return results;
   },
 
   // Constant getters
