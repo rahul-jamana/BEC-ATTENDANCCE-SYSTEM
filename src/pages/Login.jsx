@@ -143,11 +143,10 @@ export const Login = () => {
               </button>
             </form>
 
-            <div className="mt-3 text-center">
-              <span className="text-xs text-slate-500">New Student? </span>
-              <Link to="/signup" className="text-xs font-bold text-blue-600 hover:underline">
-                Create Student Account
-              </Link>
+            <div className="mt-4 text-center">
+              <span className="text-xs font-bold text-blue-700 tracking-wide uppercase bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
+                ✨ Welcome to BEC
+              </span>
             </div>
           </div>
 
