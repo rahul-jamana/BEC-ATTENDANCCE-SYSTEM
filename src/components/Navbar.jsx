@@ -1,4 +1,7 @@
+import React from "react";
+import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { LogOut, Shield, GraduationCap, School } from "lucide-react";
 
 export const Navbar = () => {
   const { userProfile, role, logout } = useAuth();
