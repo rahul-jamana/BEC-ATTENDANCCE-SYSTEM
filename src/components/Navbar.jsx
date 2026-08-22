@@ -1,9 +1,13 @@
-import React from "react";
-import { useAuth } from "../context/AuthContext";
-import { LogOut, User, Shield, GraduationCap, School, QrCode } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export const Navbar = () => {
   const { userProfile, role, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login");
+  };
 
   const getRoleBadge = () => {
     switch (role) {
@@ -71,8 +75,8 @@ export const Navbar = () => {
               </div>
 
               <button
-                onClick={logout}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-red-600 bg-slate-100 hover:bg-red-50 rounded-lg transition-colors border border-slate-200"
+                onClick={handleLogout}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-red-600 bg-slate-100 hover:bg-red-50 rounded-lg transition-colors border border-slate-200 cursor-pointer"
                 title="Sign Out"
               >
                 <LogOut className="w-4 h-4" />

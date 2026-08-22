@@ -22,12 +22,14 @@ let app = null;
 let auth = null;
 let db = null;
 
-try {
-  app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
-} catch (error) {
-  console.warn("Firebase initialization warning (Falling back to local demo storage mode):", error);
+if (isLiveFirebaseConfigured) {
+  try {
+    app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+  } catch (error) {
+    console.warn("Firebase initialization warning:", error);
+  }
 }
 
 export { app, auth, db };

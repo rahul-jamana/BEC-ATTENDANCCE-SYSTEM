@@ -92,6 +92,7 @@ export const AyushMasterPortal = () => {
     sessionStorage.removeItem("ayush_master_authenticated");
     setAuthEmail("");
     setAuthPassword("");
+    setAuthError("");
   };
 
   const handleCreateUser = async (e) => {
