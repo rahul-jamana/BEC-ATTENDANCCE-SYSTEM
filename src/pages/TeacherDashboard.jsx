@@ -55,18 +55,21 @@ export const TeacherDashboard = () => {
     loadTeacherData();
   }, [userProfile]);
 
+  const bputSubjects = DataService.getBputSubjectsForBranch(classForm.branch, classForm.semester);
+
   const handleCreateSession = async (e) => {
     e.preventDefault();
-    const selectedSub = subjects.find(s => s.id === classForm.subjectId);
+    const selectedSub = bputSubjects.find(s => s.code === classForm.subjectId) || subjects.find(s => s.id === classForm.subjectId);
     const initialToken = `tok_${Math.random().toString(36).substring(2, 8)}`;
+    const subName = selectedSub ? `${selectedSub.name} (${selectedSub.code || ''})` : (classForm.subjectId || "Class Lecture");
 
     const newSess = await DataService.createSession({
       branch: classForm.branch,
       year: classForm.year,
       section: classForm.section,
       semester: classForm.semester,
-      subjectId: classForm.subjectId,
-      subjectName: selectedSub ? selectedSub.name : "Class Subject",
+      subjectId: classForm.subjectId || "SUB101",
+      subjectName: subName,
       teacherId: userProfile?.uid || "teacher_01",
       teacherName: userProfile?.name || "Dr. Rajesh Sharma",
       token: initialToken,
@@ -114,11 +117,11 @@ export const TeacherDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-sky-50 to-blue-100 pb-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         
         {/* Faculty Header Banner */}
-        <div className="gradient-header text-white rounded-3xl p-6 sm:p-8 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        <div className="gradient-header text-white rounded-3xl p-6 sm:p-8 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-blue-400/30">
           <div className="space-y-1">
             <span className="px-3 py-1 bg-white/20 text-white rounded-full text-xs font-bold uppercase tracking-wider backdrop-blur-md">
               Faculty Dashboard
@@ -132,7 +135,7 @@ export const TeacherDashboard = () => {
           {activeSession && (
             <button
               onClick={() => setIsProjectorOpen(true)}
-              className="px-6 py-3 bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center space-x-2 animate-pulse cursor-pointer"
+              className="px-6 py-3 bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs rounded-2xl shadow-lg transition-all flex items-center space-x-2 animate-pulse cursor-pointer"
             >
               <QrCode className="w-4 h-4 text-slate-950" />
               <span>Resume Projector QR ({getSessionAttendanceCount(activeSession.id)} Scanned)</span>
@@ -141,14 +144,14 @@ export const TeacherDashboard = () => {
         </div>
 
         {/* Start Class Form Card */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200 space-y-6">
+        <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 sm:p-8 shadow-sm border border-blue-100 space-y-6">
           <div className="flex items-center space-x-3 border-b border-slate-100 pb-4">
-            <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+            <div className="w-10 h-10 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
               <Play className="w-5 h-5 fill-current" />
             </div>
             <div>
               <h2 className="text-xl font-bold text-slate-900">Start New Class Session</h2>
-              <p className="text-xs text-slate-500">Select class parameters to generate dynamic 30s rotating QR code</p>
+              <p className="text-xs text-slate-500">Select branch &amp; BPUT subject to generate dynamic 30s rotating QR code</p>
             </div>
           </div>
 
@@ -160,8 +163,8 @@ export const TeacherDashboard = () => {
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Branch</label>
                 <select
                   value={classForm.branch}
-                  onChange={(e) => setClassForm({ ...classForm, branch: e.target.value })}
-                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500"
+                  onChange={(e) => setClassForm({ ...classForm, branch: e.target.value, subjectId: "" })}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 cursor-pointer"
                 >
                   {branches.map(b => <option key={b} value={b}>{b}</option>)}
                 </select>
@@ -173,7 +176,7 @@ export const TeacherDashboard = () => {
                 <select
                   value={classForm.year}
                   onChange={(e) => setClassForm({ ...classForm, year: e.target.value })}
-                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 cursor-pointer"
                 >
                   {years.map(y => <option key={y} value={y}>{y}</option>)}
                 </select>
@@ -185,7 +188,7 @@ export const TeacherDashboard = () => {
                 <select
                   value={classForm.section}
                   onChange={(e) => setClassForm({ ...classForm, section: e.target.value })}
-                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 cursor-pointer"
                 >
                   {sections.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
@@ -196,24 +199,30 @@ export const TeacherDashboard = () => {
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Semester</label>
                 <select
                   value={classForm.semester}
-                  onChange={(e) => setClassForm({ ...classForm, semester: e.target.value })}
-                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500"
+                  onChange={(e) => setClassForm({ ...classForm, semester: e.target.value, subjectId: "" })}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 cursor-pointer"
                 >
-                  {semesters.map(sem => <option key={sem} value={sem}>{sem}</option>)}
+                  {semesters.map(sem => <option key={sem} value={sem}>Sem {sem}</option>)}
                 </select>
               </div>
 
-              {/* Subject */}
+              {/* Subject (Integrated with full BPUT Curriculum) */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Subject</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">BPUT Subject</label>
                 <select
                   value={classForm.subjectId}
                   onChange={(e) => setClassForm({ ...classForm, subjectId: e.target.value })}
-                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 cursor-pointer"
                 >
-                  {subjects.map(sub => (
+                  <option value="">-- Choose Subject --</option>
+                  {bputSubjects.map(sub => (
+                    <option key={sub.code} value={sub.code}>
+                      {sub.code} - {sub.name}
+                    </option>
+                  ))}
+                  {subjects.filter(s => s.branch === classForm.branch).map(sub => (
                     <option key={sub.id} value={sub.id}>
-                      {sub.name} ({sub.branch})
+                      {sub.name}
                     </option>
                   ))}
                 </select>
@@ -224,7 +233,8 @@ export const TeacherDashboard = () => {
             <div className="flex justify-end">
               <button
                 type="submit"
-                className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm rounded-xl transition-all shadow-md shadow-blue-500/20 flex items-center space-x-2 cursor-pointer"
+                disabled={!classForm.subjectId}
+                className="px-8 py-3.5 bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-700 hover:to-sky-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-extrabold text-xs sm:text-sm rounded-2xl transition-all shadow-md shadow-blue-500/25 flex items-center space-x-2 cursor-pointer"
               >
                 <QrCode className="w-5 h-5" />
                 <span>GENERATE PROJECTOR QR CODE</span>
