@@ -6,13 +6,23 @@ import {
   Shield, UserPlus, Users, School, GraduationCap, ArrowRight, 
   Trash2, CheckCircle2, AlertCircle, RefreshCw, KeyRound, 
   Sparkles, Layers, Lock, Mail, User, BookOpen, Check, X, 
-  ShieldAlert, Eye, EyeOff, Key
+  ShieldAlert, Eye, EyeOff, Key, LogOut, ShieldCheck, LockKeyhole
 } from "lucide-react";
 
 export const AyushMasterPortal = () => {
   const { masterLoginAsUser } = useAuth();
   const navigate = useNavigate();
 
+  // Master Gate Authentication State
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return sessionStorage.getItem("ayush_master_authenticated") === "true";
+  });
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [showAuthPassword, setShowAuthPassword] = useState(false);
+
+  // Portal Dashboard State
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("create"); // "create" | "users" | "quick-switch"
@@ -52,8 +62,37 @@ export const AyushMasterPortal = () => {
   };
 
   useEffect(() => {
-    loadAllUsers();
-  }, []);
+    if (isAuthenticated) {
+      loadAllUsers();
+    }
+  }, [isAuthenticated]);
+
+  // Master Gate Login Handler
+  const handleMasterLogin = (e) => {
+    e.preventDefault();
+    setAuthError("");
+
+    const targetEmail = "ayushtechbbse@gmail.com";
+    const targetPass = "ayush#@2026";
+
+    if (
+      authEmail.trim().toLowerCase() === targetEmail.toLowerCase() &&
+      authPassword.trim() === targetPass
+    ) {
+      setIsAuthenticated(true);
+      sessionStorage.setItem("ayush_master_authenticated", "true");
+      setAuthError("");
+    } else {
+      setAuthError("Invalid credentials! Access restricted to authorized Master Admin only.");
+    }
+  };
+
+  const handleMasterLogout = () => {
+    setIsAuthenticated(false);
+    sessionStorage.removeItem("ayush_master_authenticated");
+    setAuthEmail("");
+    setAuthPassword("");
+  };
 
   const handleCreateUser = async (e) => {
     e.preventDefault();
@@ -172,6 +211,96 @@ export const AyushMasterPortal = () => {
     }
   };
 
+  // ──────────────────────────────────────────────────────────────
+  // VIEW 1: MASTER LOGIN GATE SCREEN (When Not Authenticated)
+  // ──────────────────────────────────────────────────────────────
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-200 via-sky-100 to-blue-100 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white/95 backdrop-blur-md rounded-3xl p-8 shadow-2xl border border-blue-200/80 space-y-6">
+          
+          {/* Header Badge */}
+          <div className="text-center space-y-2">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-sky-500 text-white flex items-center justify-center shadow-lg mx-auto ring-4 ring-blue-100">
+              <LockKeyhole className="w-8 h-8" />
+            </div>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight">Ayush Master Access</h1>
+            <p className="text-xs text-slate-500">Enter master credentials to unlock administrative creation studio</p>
+          </div>
+
+          {authError && (
+            <div className="p-3.5 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl font-medium flex items-center gap-2 animate-in fade-in">
+              <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+              <span>{authError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleMasterLogin} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Master ID / Email
+              </label>
+              <div className="relative">
+                <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                <input
+                  type="email"
+                  required
+                  placeholder="ayushtechbbse@gmail.com"
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-none transition-all"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+                <span>Master Password</span>
+                <button
+                  type="button"
+                  onClick={() => setShowAuthPassword(!showAuthPassword)}
+                  className="text-[10px] text-blue-600 hover:underline flex items-center gap-0.5 cursor-pointer"
+                >
+                  {showAuthPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                  <span>{showAuthPassword ? "Hide" : "Show"}</span>
+                </button>
+              </label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                <input
+                  type={showAuthPassword ? "text" : "password"}
+                  required
+                  placeholder="••••••••"
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-none transition-all font-mono"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="w-full py-3.5 bg-gradient-to-r from-blue-600 via-sky-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold rounded-2xl text-xs sm:text-sm transition-all shadow-md shadow-blue-500/25 flex items-center justify-center space-x-2 cursor-pointer"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              <span>Unlock Master Hub</span>
+            </button>
+          </form>
+
+          <div className="pt-4 border-t border-slate-100 text-center">
+            <Link to="/login" className="text-xs text-slate-500 hover:text-blue-600 font-semibold transition-colors">
+              ← Return to Main Login Portal
+            </Link>
+          </div>
+
+        </div>
+      </div>
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // VIEW 2: FULL AYUSH MASTER CONTROL HUB (When Authenticated)
+  // ──────────────────────────────────────────────────────────────
   const adminCount = users.filter(u => u.role === "admin").length;
   const teacherCount = users.filter(u => u.role === "teacher").length;
   const studentCount = users.filter(u => u.role === "student").length;
@@ -192,20 +321,28 @@ export const AyushMasterPortal = () => {
                 <h1 className="text-lg sm:text-xl font-black text-white tracking-wide">
                   Ayush Master Control Hub
                 </h1>
-                <span className="px-2.5 py-0.5 bg-amber-400 text-blue-950 text-[10px] font-black uppercase rounded-full tracking-wider shadow-xs">
-                  ROOT ACCESS
+                <span className="px-2.5 py-0.5 bg-emerald-400 text-blue-950 text-[10px] font-black uppercase rounded-full tracking-wider shadow-xs flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3" /> AUTHENTICATED
                 </span>
               </div>
-              <p className="text-xs text-blue-100 font-mono">/login/ayush • Full Account Creation &amp; Password Management</p>
+              <p className="text-xs text-blue-100 font-mono">ayushtechbbse@gmail.com • Full Account Creation &amp; Password Studio</p>
             </div>
           </div>
 
           <div className="flex items-center space-x-2">
+            <button
+              onClick={handleMasterLogout}
+              className="px-3.5 py-2 bg-rose-600/80 hover:bg-rose-600 text-white text-xs font-bold rounded-xl border border-rose-400/30 transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+              title="Lock & Logout Master Hub"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Lock Master</span>
+            </button>
             <Link
               to="/login"
-              className="px-4 py-2 bg-white/15 hover:bg-white/25 text-white text-xs font-bold rounded-xl border border-white/20 transition-colors shadow-xs"
+              className="px-3.5 py-2 bg-white/15 hover:bg-white/25 text-white text-xs font-bold rounded-xl border border-white/20 transition-colors shadow-xs"
             >
-              Back to Login
+              Login Page
             </Link>
             <button
               onClick={loadAllUsers}
@@ -414,7 +551,7 @@ export const AyushMasterPortal = () => {
                   </div>
                 </div>
 
-                {/* 3. Password (Crucial Feature) */}
+                {/* 3. Password */}
                 <div className="space-y-1.5">
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center justify-between">
                     <span>Login Password *</span>
