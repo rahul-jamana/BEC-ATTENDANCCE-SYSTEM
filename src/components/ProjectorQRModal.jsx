@@ -76,15 +76,30 @@ export const ProjectorQRModal = ({ isOpen, onClose, session, onEndSession }) => 
 
         {/* Left Column: QR Code & Rotation Timer */}
         <div className="flex flex-col items-center text-center space-y-6 w-full md:w-1/2">
-          {/* Header Title */}
-          <div>
+          {/* Header Title & Teacher Verified Photo */}
+          <div className="flex flex-col items-center space-y-2">
+            {session.teacherPhoto && (
+              <div className="relative">
+                <img
+                  src={session.teacherPhoto}
+                  alt="Faculty Live Photo"
+                  className="w-16 h-16 rounded-full object-cover border-2 border-emerald-400 shadow-lg"
+                />
+                <span className="absolute -bottom-1 -right-1 bg-emerald-500 text-white rounded-full p-0.5 text-[10px]" title="Faculty Live Verified">
+                  <CheckCircle className="w-4 h-4" />
+                </span>
+              </div>
+            )}
             <span className="px-3 py-1 bg-blue-500/20 text-blue-400 text-xs font-bold uppercase tracking-wider rounded-full border border-blue-500/30">
               Live Classroom Projector Mode
             </span>
-            <h2 className="text-2xl sm:text-3xl font-extrabold mt-2 text-white">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-white">
               {session.subjectName || "Subject Class"}
             </h2>
-            <p className="text-slate-400 text-sm mt-1">
+            <p className="text-slate-400 text-sm">
+              Faculty: <span className="text-emerald-400 font-bold">{session.teacherName || "Faculty"} (Live Verified 📸)</span>
+            </p>
+            <p className="text-slate-400 text-xs">
               Target Roster: <span className="text-blue-400 font-bold">{session.branch}</span> | Year <span className="text-blue-400 font-bold">{session.year}</span> | Section <span className="text-blue-400 font-bold">{session.section}</span> (Sem {session.semester})
             </p>
           </div>
@@ -158,9 +173,17 @@ export const ProjectorQRModal = ({ isOpen, onClose, session, onEndSession }) => 
                   className="bg-slate-900/80 border border-slate-700/80 rounded-xl p-3 flex items-center justify-between animate-in fade-in slide-in-from-bottom-2"
                 >
                   <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-xs">
-                      {idx + 1}
-                    </div>
+                    {att.livePhoto ? (
+                      <img 
+                        src={att.livePhoto} 
+                        alt={att.studentName}
+                        className="w-9 h-9 rounded-full object-cover border-2 border-emerald-400 shrink-0" 
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-xs">
+                        {idx + 1}
+                      </div>
+                    )}
                     <div>
                       <h4 className="font-bold text-sm text-slate-200">{att.studentName}</h4>
                       <p className="text-xs text-slate-400 font-mono">Roll: {att.rollNo}</p>

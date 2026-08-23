@@ -6,7 +6,7 @@ import { exportAttendancePDF, exportAttendanceExcel } from "../utils/pdfExporter
 import { 
   Shield, UserCheck, UserX, Users, BookOpen, Upload, FileText, Download, 
   Trash2, Plus, RefreshCw, CheckCircle, AlertCircle, Layers, ClipboardCheck,
-  HeartPulse, Sparkles, AlertTriangle
+  HeartPulse, Sparkles, AlertTriangle, Camera, Image as ImageIcon
 } from "lucide-react";
 
 export const AdminDashboard = () => {
@@ -16,6 +16,8 @@ export const AdminDashboard = () => {
   const [sessions, setSessions] = useState([]);
   const [attendance, setAttendance] = useState([]);
   const [activeTab, setActiveTab] = useState("pending");
+  const [photoFilter, setPhotoFilter] = useState({ branch: "All", year: "All", section: "All" });
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
 
   // New Subject Form
   const [newSubForm, setNewSubForm] = useState({ name: "", code: "", branch: "CSE", semester: "3" });
@@ -278,6 +280,51 @@ export const AdminDashboard = () => {
   // Approved students list for medical selection
   const approvedStudents = users.filter(u => u.role === "student" && u.status === "approved");
 
+  const studentPhotoEntries = attendance
+    .filter(record => record.livePhoto && record.livePhoto.startsWith("http"))
+    .filter(record => {
+      if (photoFilter.branch !== "All" && record.branch !== photoFilter.branch) return false;
+      if (photoFilter.year !== "All" && record.year !== photoFilter.year) return false;
+      if (photoFilter.section !== "All" && record.section !== photoFilter.section) return false;
+      return true;
+    })
+    .map(record => ({
+      id: record.id,
+      type: "student",
+      name: record.studentName || "Student",
+      rollNo: record.rollNo,
+      branch: record.branch,
+      year: record.year,
+      section: record.section,
+      semester: record.semester,
+      subjectName: record.subjectName,
+      imageUrl: record.livePhoto,
+      markedAt: record.markedAt
+    }))
+    .sort((a, b) => new Date(b.markedAt) - new Date(a.markedAt));
+
+  const teacherPhotoEntries = sessions
+    .filter(session => session.teacherPhoto && typeof session.teacherPhoto === "string" && session.teacherPhoto.startsWith("http"))
+    .filter(session => {
+      if (photoFilter.branch !== "All" && session.branch !== photoFilter.branch) return false;
+      if (photoFilter.year !== "All" && session.year !== photoFilter.year) return false;
+      if (photoFilter.section !== "All" && session.section !== photoFilter.section) return false;
+      return true;
+    })
+    .map(session => ({
+      id: session.id,
+      type: "teacher",
+      name: session.teacherName || "Faculty",
+      branch: session.branch,
+      year: session.year,
+      section: session.section,
+      semester: session.semester,
+      subjectName: session.subjectName,
+      imageUrl: session.teacherPhoto,
+      markedAt: session.createdAt || session.startedAt
+    }))
+    .sort((a, b) => new Date(b.markedAt || 0) - new Date(a.markedAt || 0));
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-100 via-sky-50 to-blue-100 pb-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -383,7 +430,133 @@ export const AdminDashboard = () => {
             <FileText className="w-4 h-4" />
             <span>Macro Reports</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab("photos")}
+            className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center space-x-2 transition-all cursor-pointer ${
+              activeTab === "photos"
+                ? "bg-gradient-to-r from-blue-600 to-sky-600 text-white shadow-md shadow-blue-500/25"
+                : "bg-white text-slate-600 hover:bg-blue-50 hover:text-blue-700 border border-slate-200"
+            }`}
+          >
+            <Camera className="w-4 h-4" />
+            <span>Photo Access</span>
+          </button>
         </div>
+
+        {activeTab === "photos" && (
+          <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 sm:p-8 shadow-sm border border-blue-100 space-y-6">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-100 pb-4">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Admin Photo Review</h2>
+                <p className="text-xs text-slate-500">Cloudinary-only student and faculty photo access, separated by role and filtered by class.</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={photoFilter.branch}
+                  onChange={(e) => setPhotoFilter({ ...photoFilter, branch: e.target.value })}
+                  className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700"
+                >
+                  <option value="All">All Branches</option>
+                  {DataService.getDepartments().map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+                <select
+                  value={photoFilter.year}
+                  onChange={(e) => setPhotoFilter({ ...photoFilter, year: e.target.value })}
+                  className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700"
+                >
+                  <option value="All">All Years</option>
+                  {DataService.getYears().map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+                <select
+                  value={photoFilter.section}
+                  onChange={(e) => setPhotoFilter({ ...photoFilter, section: e.target.value })}
+                  className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700"
+                >
+                  <option value="All">All Sections</option>
+                  {DataService.getSections().map(s => <option key={s} value={s}>Sec {s}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2"><ImageIcon className="w-4 h-4 text-blue-600" /> Student Live Photos</h3>
+                  <span className="text-xs font-mono font-bold bg-blue-50 text-blue-800 border border-blue-200 px-2.5 py-1 rounded-lg">{studentPhotoEntries.length}</span>
+                </div>
+
+                {studentPhotoEntries.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
+                    No student photos found for the selected filters.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {studentPhotoEntries.map(item => (
+                      <div key={item.id} className="border border-slate-200 rounded-2xl overflow-hidden bg-slate-50 shadow-sm">
+                        <img src={item.imageUrl} alt={item.name} className="w-full h-40 object-cover cursor-pointer" onClick={() => setSelectedPhoto(item.imageUrl)} />
+                        <div className="p-3 space-y-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="font-bold text-slate-900 text-sm">{item.name}</p>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">Student</span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 font-mono">{item.rollNo || "Roll N/A"}</p>
+                          <p className="text-[11px] text-slate-600">{item.branch} • {item.year} • Sec {item.section}</p>
+                          <p className="text-[11px] text-slate-600">{item.subjectName}</p>
+                          <p className="text-[10px] text-slate-500">{new Date(item.markedAt).toLocaleString()}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2"><Camera className="w-4 h-4 text-sky-600" /> Teacher Photos</h3>
+                  <span className="text-xs font-mono font-bold bg-sky-50 text-sky-800 border border-sky-200 px-2.5 py-1 rounded-lg">{teacherPhotoEntries.length}</span>
+                </div>
+
+                {teacherPhotoEntries.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
+                    No teacher photos found for the selected filters.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {teacherPhotoEntries.map(item => (
+                      <div key={item.id} className="border border-slate-200 rounded-2xl overflow-hidden bg-slate-50 shadow-sm">
+                        <img src={item.imageUrl} alt={item.name} className="w-full h-40 object-cover cursor-pointer" onClick={() => setSelectedPhoto(item.imageUrl)} />
+                        <div className="p-3 space-y-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="font-bold text-slate-900 text-sm">{item.name}</p>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 font-bold">Faculty</span>
+                          </div>
+                          <p className="text-[11px] text-slate-600">{item.branch} • {item.year} • Sec {item.section}</p>
+                          <p className="text-[11px] text-slate-600">{item.subjectName}</p>
+                          <p className="text-[10px] text-slate-500">{new Date(item.markedAt || Date.now()).toLocaleString()}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {selectedPhoto && (
+          <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-950/80 p-4" onClick={() => setSelectedPhoto(null)}>
+            <div className="relative max-w-3xl w-full rounded-3xl bg-white p-3 shadow-2xl" onClick={e => e.stopPropagation()}>
+              <button
+                onClick={() => setSelectedPhoto(null)}
+                className="absolute top-3 right-3 z-10 bg-slate-900/80 text-white rounded-full p-2 hover:bg-slate-700"
+              >
+                ✕
+              </button>
+              <img src={selectedPhoto} alt="Selected photo preview" className="w-full max-h-[80vh] object-contain rounded-2xl" />
+            </div>
+          </div>
+        )}
 
         {/* TAB 1: PENDING APPROVALS */}
         {activeTab === "pending" && (

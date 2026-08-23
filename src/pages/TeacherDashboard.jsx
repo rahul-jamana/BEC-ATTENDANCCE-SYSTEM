@@ -2,10 +2,11 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { DataService } from "../services/dataService";
 import { ProjectorQRModal } from "../components/ProjectorQRModal";
-import { exportAttendancePDF, exportAttendanceExcel } from "../utils/pdfExporter";
+import { TeacherPhotoModal } from "../components/TeacherPhotoModal";
+import { exportAttendancePDF, exportAttendanceExcel, exportTeacherSessionExcel } from "../utils/pdfExporter";
 import { 
   QrCode, School, Play, StopCircle, FileText, Download, Users, 
-  Sparkles, CheckCircle2, Clock, Filter, BookOpen, Layers
+  Sparkles, CheckCircle2, Clock, Filter, BookOpen, Layers, Camera
 } from "lucide-react";
 
 export const TeacherDashboard = () => {
@@ -15,6 +16,8 @@ export const TeacherDashboard = () => {
   const [attendanceLogs, setAttendanceLogs] = useState([]);
   const [activeSession, setActiveSession] = useState(null);
   const [isProjectorOpen, setIsProjectorOpen] = useState(false);
+  const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
+  const [pendingSessionData, setPendingSessionData] = useState(null);
 
   // Class Selection State
   const [classForm, setClassForm] = useState({
@@ -57,13 +60,14 @@ export const TeacherDashboard = () => {
 
   const bputSubjects = DataService.getBputSubjectsForBranch(classForm.branch, classForm.semester);
 
-  const handleCreateSession = async (e) => {
+  // Step 1: Form submission opens Teacher Photo Capture Modal
+  const handleInitiateSession = (e) => {
     e.preventDefault();
     const selectedSub = bputSubjects.find(s => s.code === classForm.subjectId) || subjects.find(s => s.id === classForm.subjectId);
     const initialToken = `tok_${Math.random().toString(36).substring(2, 8)}`;
     const subName = selectedSub ? `${selectedSub.name} (${selectedSub.code || ''})` : (classForm.subjectId || "Class Lecture");
 
-    const newSess = await DataService.createSession({
+    const sessionPayload = {
       branch: classForm.branch,
       year: classForm.year,
       section: classForm.section,
@@ -75,8 +79,23 @@ export const TeacherDashboard = () => {
       token: initialToken,
       tokenGeneratedAt: Date.now(),
       expiresAt: Date.now() + 600000 // 10 min session duration
+    };
+
+    setPendingSessionData(sessionPayload);
+    setIsPhotoModalOpen(true);
+  };
+
+  // Step 2: Faculty confirms live photo -> create session & launch projector
+  const handleTeacherPhotoConfirmed = async (teacherPhotoUrl) => {
+    if (!pendingSessionData) return;
+
+    const newSess = await DataService.createSession({
+      ...pendingSessionData,
+      teacherPhoto: teacherPhotoUrl
     });
 
+    setIsPhotoModalOpen(false);
+    setPendingSessionData(null);
     setActiveSession(newSess);
     setIsProjectorOpen(true);
     loadTeacherData();
@@ -108,10 +127,10 @@ export const TeacherDashboard = () => {
 
   const handleExportSessionExcel = (sess) => {
     const records = attendanceLogs.filter(a => a.sessionId === sess.id);
-    exportAttendanceExcel({
-      title: `Class Session ${sess.subjectName}`,
-      branch: sess.branch,
-      subject: sess.subjectName,
+    // Use new teacher Excel with embedded teacher photo + student selfies
+    exportTeacherSessionExcel({
+      session: sess,
+      teacherProfile: userProfile,
       records
     });
   };
@@ -131,16 +150,6 @@ export const TeacherDashboard = () => {
               Department: {userProfile?.department || "CSE"} • Faculty Portal &amp; Dynamic QR Class Generator
             </p>
           </div>
-
-          {activeSession && (
-            <button
-              onClick={() => setIsProjectorOpen(true)}
-              className="px-6 py-3 bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs rounded-2xl shadow-lg transition-all flex items-center space-x-2 animate-pulse cursor-pointer"
-            >
-              <QrCode className="w-4 h-4 text-slate-950" />
-              <span>Resume Projector QR ({getSessionAttendanceCount(activeSession.id)} Scanned)</span>
-            </button>
-          )}
         </div>
 
         {/* Start Class Form Card */}
@@ -155,7 +164,7 @@ export const TeacherDashboard = () => {
             </div>
           </div>
 
-          <form onSubmit={handleCreateSession} className="space-y-6">
+          <form onSubmit={handleInitiateSession} className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
               
               {/* Branch */}
@@ -236,8 +245,8 @@ export const TeacherDashboard = () => {
                 disabled={!classForm.subjectId}
                 className="px-8 py-3.5 bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-700 hover:to-sky-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-extrabold text-xs sm:text-sm rounded-2xl transition-all shadow-md shadow-blue-500/25 flex items-center space-x-2 cursor-pointer"
               >
-                <QrCode className="w-5 h-5" />
-                <span>GENERATE PROJECTOR QR CODE</span>
+                <Camera className="w-5 h-5" />
+                <span>STEP 1: CAPTURE LIVE PHOTO &amp; START CLASS</span>
               </button>
             </div>
           </form>
@@ -247,7 +256,7 @@ export const TeacherDashboard = () => {
         <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200 space-y-6">
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
             <div>
-              <h2 className="text-xl font-bold text-slate-900">Class Session History & Reports</h2>
+              <h2 className="text-xl font-bold text-slate-900">Class Session History &amp; Reports</h2>
               <p className="text-xs text-slate-500">Filter, view, and export past classroom attendance reports</p>
             </div>
             <span className="text-xs font-mono font-bold bg-slate-100 px-3 py-1 rounded-lg text-slate-600">
@@ -321,6 +330,17 @@ export const TeacherDashboard = () => {
         </div>
 
       </div>
+
+      {/* Teacher Live Photo Verification Modal */}
+      <TeacherPhotoModal
+        isOpen={isPhotoModalOpen}
+        onClose={() => {
+          setIsPhotoModalOpen(false);
+          setPendingSessionData(null);
+        }}
+        onConfirmPhoto={handleTeacherPhotoConfirmed}
+        sessionDetails={pendingSessionData}
+      />
 
       {/* Projector Mode Large QR Modal */}
       <ProjectorQRModal

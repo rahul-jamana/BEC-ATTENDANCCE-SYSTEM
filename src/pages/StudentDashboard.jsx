@@ -2,10 +2,11 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { DataService } from "../services/dataService";
 import { QRScannerModal } from "../components/QRScannerModal";
+import { exportStudentCompleteExcel, exportClassTotalExcel } from "../utils/pdfExporter";
 import { 
   Camera, QrCode, AlertTriangle, CheckCircle2, BookOpen, GraduationCap, 
   BarChart3, RefreshCw, Sparkles, Award, Clock, FileText, HeartPulse, 
-  User, Calendar, ShieldCheck, ChevronRight, Layers, TrendingUp
+  User, Calendar, ShieldCheck, ChevronRight, Layers, TrendingUp, Download, X
 } from "lucide-react";
 
 export const StudentDashboard = () => {
@@ -15,6 +16,7 @@ export const StudentDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("overview"); // "overview" | "subjects" | "logs"
+  const [previewPhoto, setPreviewPhoto] = useState(null);
 
   const fetchStudentStats = async () => {
     if (!userProfile) return;
@@ -39,10 +41,34 @@ export const StudentDashboard = () => {
     fetchStudentStats();
   }, [userProfile]);
 
+  const handleExportMyExcel = () => {
+    exportStudentCompleteExcel({
+      studentProfile,
+      stats,
+      records: attendanceLogs
+    });
+  };
+
+  const handleExportClassExcel = async () => {
+    const allAttendance = await DataService.getAttendance();
+    const classRecords = allAttendance.filter(
+      a => a.branch === userProfile?.branch &&
+           a.year === userProfile?.year &&
+           a.section === userProfile?.section
+    );
+    exportClassTotalExcel({
+      branch: userProfile?.branch,
+      year: userProfile?.year,
+      section: userProfile?.section,
+      semester: userProfile?.semester,
+      records: classRecords
+    });
+  };
+
   // Total Cumulative Attendance Calculations
   const totalAttended = stats.reduce((acc, curr) => acc + (curr.attendedClasses || 0), 0);
   const totalClasses = stats.reduce((acc, curr) => acc + (curr.totalClasses || 0), 0);
-  const overallPercentage = totalClasses > 0 ? Math.round((totalAttended / totalClasses) * 100) : 100;
+  const overallPercentage = totalClasses > 0 ? Math.round((totalAttended / totalClasses) * 100) : 0;
   const isOverallWarning = overallPercentage < 75;
   const atRiskCount = stats.filter(s => s.isWarning).length;
   const goodStandingCount = stats.filter(s => !s.isWarning).length;
@@ -78,7 +104,7 @@ export const StudentDashboard = () => {
               </p>
             </div>
 
-            {/* SUPER PROMINENT SCAN QR CODE BUTTON (Main Feature) */}
+            {/* SUPER PROMINENT SCAN QR CODE & EXCEL DOWNLOAD BUTTONS */}
             <div className="w-full lg:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <button
                 onClick={() => setIsScannerOpen(true)}
@@ -92,6 +118,15 @@ export const StudentDashboard = () => {
                   <div className="text-base sm:text-xl font-extrabold tracking-wide">SCAN QR CODE</div>
                 </div>
                 <div className="w-3 h-3 rounded-full bg-emerald-500 animate-ping ml-2"></div>
+              </button>
+
+              <button
+                onClick={handleExportMyExcel}
+                className="px-5 py-4 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black rounded-2xl border border-emerald-400 flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer"
+                title="Download My Personal Attendance Excel Sheet"
+              >
+                <Download className="w-4 h-4" />
+                <span className="hidden sm:inline">My Excel</span>
               </button>
 
               <button
@@ -221,6 +256,38 @@ export const StudentDashboard = () => {
                 <Camera className="w-4 h-4 text-blue-700" />
                 <span>Open Scanner</span>
               </button>
+            </div>
+
+            {/* Sidebar Excel Export Card */}
+            <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-5 shadow-sm border border-emerald-200 space-y-3">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                  <Download className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-sm text-slate-900">Excel Reports (.xlsx)</h4>
+                  <p className="text-[11px] text-slate-500">Download official sheets</p>
+                </div>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Export complete subject breakdown &amp; total class attendance roster in Excel format.
+              </p>
+              <div className="space-y-2">
+                <button
+                  onClick={handleExportMyExcel}
+                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>My Attendance Excel</span>
+                </button>
+                <button
+                  onClick={handleExportClassExcel}
+                  className="w-full py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold text-[11px] rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Download className="w-3 h-3 text-emerald-600" />
+                  <span>Total Class Roster Excel</span>
+                </button>
+              </div>
             </div>
 
             {/* Sidebar Student Academic Profile Summary */}
@@ -412,9 +479,17 @@ export const StudentDashboard = () => {
                       <h2 className="text-xl font-extrabold text-slate-900">Subject Wise Attendance Breakdown</h2>
                       <p className="text-xs text-slate-500">Calculated automatically from total class sessions held for {userProfile?.branch} Sec-{userProfile?.section}</p>
                     </div>
-                    <span className="px-3 py-1 bg-blue-50 text-blue-800 border border-blue-200 rounded-xl text-xs font-bold">
-                      {stats.length} Subjects Enrolled
-                    </span>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={handleExportMyExcel}
+                        className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5 text-emerald-600" /> Export Excel
+                      </button>
+                      <span className="px-3 py-1 bg-blue-50 text-blue-800 border border-blue-200 rounded-xl text-xs font-bold">
+                        {stats.length} Subjects Enrolled
+                      </span>
+                    </div>
                   </div>
 
                   {loading ? (
@@ -500,9 +575,17 @@ export const StudentDashboard = () => {
                     <h2 className="text-xl font-extrabold text-slate-900">Active Attendance Logs &amp; QR History</h2>
                     <p className="text-xs text-slate-500">Chronological timeline of all verified lecture attendance for {userProfile?.name}</p>
                   </div>
-                  <span className="px-3 py-1 bg-blue-50 text-blue-800 border border-blue-200 rounded-xl text-xs font-bold">
-                    Total Logs: {attendanceLogs.length}
-                  </span>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={handleExportMyExcel}
+                      className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5 text-emerald-600" /> Excel Log
+                    </button>
+                    <span className="px-3 py-1 bg-blue-50 text-blue-800 border border-blue-200 rounded-xl text-xs font-bold">
+                      Total Logs: {attendanceLogs.length}
+                    </span>
+                  </div>
                 </div>
 
                 {attendanceLogs.length === 0 ? (
@@ -527,7 +610,18 @@ export const StudentDashboard = () => {
                         {attendanceLogs.map((log) => (
                           <tr key={log.id} className="hover:bg-blue-50/40 transition-colors">
                             <td className="py-3.5 px-4 font-bold text-slate-900">
-                              {log.subjectName}
+                              <div className="flex items-center space-x-2">
+                                {log.livePhoto && (
+                                  <img
+                                    src={log.livePhoto}
+                                    alt="Live Selfie"
+                                    onClick={() => setPreviewPhoto(log.livePhoto)}
+                                    className="w-8 h-8 rounded-full object-cover border-2 border-emerald-500 shadow-xs cursor-pointer hover:scale-110 transition-transform shrink-0"
+                                    title="Click to preview verified selfie"
+                                  />
+                                )}
+                                <span>{log.subjectName}</span>
+                              </div>
                             </td>
                             <td className="py-3.5 px-4 text-slate-600 font-mono text-[11px]">
                               {new Date(log.markedAt).toLocaleString('en-IN', {
@@ -549,7 +643,7 @@ export const StudentDashboard = () => {
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-blue-100 text-blue-800 rounded-full font-bold text-[10px]">
-                                  <QrCode className="w-3 h-3 text-blue-600" /> QR Scan
+                                  <QrCode className="w-3 h-3 text-blue-600" /> QR Scan {log.livePhoto ? "📸" : ""}
                                 </span>
                               )}
                             </td>
@@ -582,6 +676,35 @@ export const StudentDashboard = () => {
           fetchStudentStats();
         }}
       />
+
+      {/* Live Photo Lightbox Preview Modal */}
+      {previewPhoto && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-in fade-in"
+          onClick={() => setPreviewPhoto(null)}
+        >
+          <div className="bg-white p-5 rounded-3xl max-w-sm w-full space-y-4 relative border border-slate-200 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <div className="flex items-center space-x-2">
+                <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                <h4 className="font-extrabold text-slate-900 text-sm">Verified Live Selfie Photo</h4>
+              </div>
+              <button onClick={() => setPreviewPhoto(null)} className="p-1 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 max-h-[340px] flex items-center justify-center">
+              <img src={previewPhoto} alt="Live Selfie Full View" className="w-full h-auto max-h-[340px] object-contain" />
+            </div>
+
+            <div className="text-center space-y-0.5">
+              <p className="text-xs font-extrabold text-emerald-700">✅ Biometric Live Verification Complete</p>
+              <p className="text-[11px] text-slate-400 font-mono">Cloudinary CDN Secured URL</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

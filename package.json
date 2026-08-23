@@ -6,9 +6,11 @@
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "npm run build && firebase deploy --only hosting"
   },
   "dependencies": {
+    "exceljs": "^4.4.0",
     "firebase": "^11.3.1",
     "html5-qrcode": "^2.3.8",
     "jspdf": "^2.5.2",
@@ -23,6 +25,7 @@
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.6",
     "@vitejs/plugin-react": "^4.3.4",
+    "firebase-tools": "^13.31.2",
     "tailwindcss": "^4.0.6",
     "vite": "^6.1.0"
   }

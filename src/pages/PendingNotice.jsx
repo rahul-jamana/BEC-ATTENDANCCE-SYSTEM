@@ -41,7 +41,11 @@ export const PendingNotice = () => {
           </button>
 
           <button
-            onClick={logout}
+            onClick={() => {
+              const confirmed = window.confirm("Are you sure you want to logout?");
+              if (!confirmed) return;
+              logout();
+            }}
             className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs flex items-center space-x-1.5 transition-colors"
           >
             <LogOut className="w-3.5 h-3.5" />

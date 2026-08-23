@@ -8,6 +8,9 @@ export const Navbar = () => {
   const navigate = useNavigate();
 
   const handleLogout = async () => {
+    const confirmed = window.confirm("Are you sure you want to logout?");
+    if (!confirmed) return;
+
     await logout();
     navigate("/login");
   };

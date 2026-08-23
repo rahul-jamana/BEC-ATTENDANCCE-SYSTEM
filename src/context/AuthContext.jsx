@@ -56,6 +56,7 @@ export const AuthProvider = ({ children }) => {
       name: studentData.name,
       rollNo: studentData.rollNo,
       email: studentData.email,
+      password: studentData.password,
       branch: studentData.branch,
       year: studentData.year,
       section: studentData.section,

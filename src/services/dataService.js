@@ -886,7 +886,7 @@ export const DataService = {
     return JSON.parse(localStorage.getItem(STORAGE_KEYS.ATTENDANCE) || "[]");
   },
 
-  async markAttendance({ student, session, token }) {
+  async markAttendance({ student, session, token, livePhoto }) {
     // 1. Verify student branch + year + section exact match
     if (
       student.branch !== session.branch ||
@@ -930,7 +930,9 @@ export const DataService = {
       subjectId: session.subjectId,
       subjectName: session.subjectName,
       markedAt: new Date().toISOString(),
-      status: "present"
+      status: "present",
+      livePhoto: livePhoto || null,
+      photoVerified: !!livePhoto
     };
 
     if (isLiveFirebaseConfigured && db) {
@@ -953,14 +955,24 @@ export const DataService = {
     const allAttendance = await this.getAttendance();
     const allSubjects = await this.getSubjects();
 
-    // Relevant subjects for student's branch & semester
-    const branchSubjects = allSubjects.filter(
-      s => s.branch === student.branch && (s.semester === student.semester || !s.semester)
+    const classAssignments = JSON.parse(localStorage.getItem("bec_class_subject_assignments_db") || "[]");
+    const assignedSubjects = classAssignments.filter(
+      a =>
+        a.branch === student.branch &&
+        a.year === student.year &&
+        a.section === student.section &&
+        a.semester === student.semester
     );
 
-    // Calculate percentage per subject
-    const stats = branchSubjects.map(sub => {
-      // Total classes held for this branch + year + section + subject
+    const assignedSubjectIds = [...new Set(assignedSubjects.map(a => a.subjectId))];
+
+    if (assignedSubjectIds.length === 0) {
+      return [];
+    }
+
+    const relevantSubjects = allSubjects.filter(sub => assignedSubjectIds.includes(sub.id));
+
+    const stats = relevantSubjects.map(sub => {
       const totalClasses = allSessions.filter(
         sess =>
           sess.branch === student.branch &&
@@ -969,14 +981,13 @@ export const DataService = {
           sess.subjectId === sub.id
       ).length;
 
-      // Attended classes by this student for this subject
       const attendedClasses = allAttendance.filter(
         att => att.studentId === student.uid && att.subjectId === sub.id
       ).length;
 
-      const percentage = totalClasses > 0 
-        ? Math.round((attendedClasses / totalClasses) * 100) 
-        : 100;
+      const percentage = totalClasses > 0
+        ? Math.round((attendedClasses / totalClasses) * 100)
+        : 0;
 
       return {
         subjectId: sub.id,

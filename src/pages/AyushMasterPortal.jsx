@@ -88,6 +88,9 @@ export const AyushMasterPortal = () => {
   };
 
   const handleMasterLogout = () => {
+    const confirmed = window.confirm("Are you sure you want to logout from the master control hub?");
+    if (!confirmed) return;
+
     setIsAuthenticated(false);
     sessionStorage.removeItem("ayush_master_authenticated");
     setAuthEmail("");
