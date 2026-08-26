@@ -2,12 +2,12 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { DataService } from "../services/dataService";
 import { parseStudentExcel } from "../utils/excelParser";
-import { exportAttendancePDF, exportAttendanceExcel } from "../utils/pdfExporter";
+import { exportAttendancePDF, exportAttendanceExcel, exportSectionMasterAttendanceExcel } from "../utils/pdfExporter";
 import { 
   Shield, UserCheck, UserX, Users, BookOpen, Upload, FileText, Download, 
   Trash2, Plus, RefreshCw, CheckCircle, AlertCircle, Layers, ClipboardCheck,
   HeartPulse, Sparkles, AlertTriangle, Camera, Image as ImageIcon,
-  Search, Filter
+  Search, Filter, GraduationCap, Percent, CheckCircle2
 } from "lucide-react";
 
 export const AdminDashboard = () => {
@@ -26,6 +26,23 @@ export const AdminDashboard = () => {
   const [userYearFilter, setUserYearFilter] = useState("all");
   const [userSectionFilter, setUserSectionFilter] = useState("all");
   const [userSearchQuery, setUserSearchQuery] = useState("");
+
+  // Section Master Attendance Excel Export State
+  const [secExcelForm, setSecExcelForm] = useState({
+    branch: "CSE",
+    year: "1st",
+    section: "A",
+    semester: "1"
+  });
+  const [secExcelExporting, setSecExcelExporting] = useState(false);
+
+  // Student 360° Attendance Explorer State
+  const [explorerBranch, setExplorerBranch] = useState("CSE");
+  const [explorerYear, setExplorerYear] = useState("1st");
+  const [explorerSection, setExplorerSection] = useState("A");
+  const [explorerStudentId, setExplorerStudentId] = useState("");
+  const [explorerStudentStats, setExplorerStudentStats] = useState([]);
+  const [explorerLoading, setExplorerLoading] = useState(false);
 
   // New Subject Form
   const [newSubForm, setNewSubForm] = useState({ name: "", code: "", branch: "CSE", semester: "3" });
@@ -287,6 +304,66 @@ export const AdminDashboard = () => {
 
   // Approved students list for medical selection
   const approvedStudents = users.filter(u => u.role === "student" && u.status === "approved");
+
+  // Approved students matching explorer filter
+  const explorerMatchingStudents = users.filter(
+    u => u.role === "student" && u.status === "approved" &&
+         u.branch === explorerBranch && u.year === explorerYear && u.section === explorerSection
+  );
+
+  // Load live stats for selected student in Student 360° Explorer
+  useEffect(() => {
+    if (explorerStudentId) {
+      const student = users.find(u => u.uid === explorerStudentId);
+      if (student) {
+        setExplorerLoading(true);
+        DataService.getStudentSubjectStats(student)
+          .then(setExplorerStudentStats)
+          .finally(() => setExplorerLoading(false));
+      }
+    } else {
+      setExplorerStudentStats([]);
+    }
+  }, [explorerStudentId, users, attendance, sessions]);
+
+  // Section Master Excel Export Handler (Downloads all subjects + final % column)
+  const handleExportSectionMasterExcel = async () => {
+    setSecExcelExporting(true);
+    try {
+      const { branch, year, section, semester } = secExcelForm;
+      const sectionStudents = users.filter(
+        u => u.role === "student" &&
+             u.status === "approved" &&
+             u.branch === branch &&
+             u.year === year &&
+             u.section === section
+      );
+
+      if (sectionStudents.length === 0) {
+        alert(`No approved students found for ${branch} ${year} Sec-${section}.`);
+        return;
+      }
+
+      const bputSubs = DataService.getBputSubjectsForBranch(branch, semester);
+      const customSubs = subjects.filter(s => s.branch === branch && String(s.semester) === String(semester));
+      const allSubs = [...bputSubs, ...customSubs.filter(cs => !bputSubs.some(bs => bs.code === cs.code))];
+
+      await exportSectionMasterAttendanceExcel({
+        branch,
+        year,
+        section,
+        semester,
+        students: sectionStudents,
+        subjects: allSubs,
+        attendanceRecords: attendance,
+        sessions
+      });
+    } catch (e) {
+      alert("Failed to export Section Master Excel: " + e.message);
+    } finally {
+      setSecExcelExporting(false);
+    }
+  };
 
 
   // Teacher class log entries for Photo Access tab (supports both Cloudinary URLs and data: base64 photos)
@@ -1484,75 +1561,351 @@ export const AdminDashboard = () => {
           </div>
         )}
 
-        {/* TAB 6: MACRO REPORTS */}
+        {/* TAB 6: MACRO REPORTS & SECTION MASTER ATTENDANCE EXCEL */}
         {activeTab === "reports" && (
-          <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 sm:p-8 shadow-sm border border-blue-100 space-y-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-100 pb-4 gap-4">
-              <div>
-                <h2 className="text-xl font-bold text-slate-900">System Wide Attendance Analytics &amp; Downloads</h2>
-                <p className="text-xs text-slate-500">Filtered logs across all branches and sections</p>
+          <div className="space-y-8">
+            
+            {/* 1. SECTION MASTER ATTENDANCE EXCEL EXPORTER */}
+            <div className="bg-gradient-to-br from-blue-600 via-sky-600 to-indigo-700 rounded-3xl p-6 sm:p-8 text-white shadow-xl space-y-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/20 pb-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-white/20 rounded-xl backdrop-blur-xs">
+                      <Download className="w-5 h-5 text-white" />
+                    </div>
+                    <h2 className="text-xl sm:text-2xl font-black tracking-tight">Section Master Attendance Excel Exporter</h2>
+                  </div>
+                  <p className="text-xs text-blue-100">
+                    Export a single unified spreadsheet for an entire section with all semester subjects and student overall percentage.
+                  </p>
+                </div>
+                <span className="px-3 py-1 bg-white/20 text-white text-xs font-mono font-bold rounded-xl border border-white/30 backdrop-blur-xs">
+                  Institutional Master Export
+                </span>
               </div>
 
-              {/* Filters & Export Buttons */}
-              <div className="flex items-center space-x-2">
-                <select
-                  value={reportFilter.branch}
-                  onChange={(e) => setReportFilter({ ...reportFilter, branch: e.target.value })}
-                  className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
-                >
-                  <option value="All">All Branches</option>
-                  {DataService.getDepartments().map(b => <option key={b} value={b}>{b}</option>)}
-                </select>
+              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/20 space-y-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-blue-100 mb-1">Target Branch</label>
+                    <select
+                      value={secExcelForm.branch}
+                      onChange={(e) => setSecExcelForm({ ...secExcelForm, branch: e.target.value })}
+                      className="w-full p-2.5 bg-white text-slate-800 font-semibold rounded-xl border-0 focus:ring-2 focus:ring-sky-300"
+                    >
+                      {DataService.getDepartments().map(b => <option key={b} value={b}>{b}</option>)}
+                    </select>
+                  </div>
 
-                <button
-                  onClick={() => exportAttendancePDF({ title: "Global Macro Report", branch: reportFilter.branch, records: filteredAttendance })}
-                  className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl flex items-center gap-1 cursor-pointer"
-                >
-                  <FileText className="w-3.5 h-3.5" /> PDF
-                </button>
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-blue-100 mb-1">Class Year</label>
+                    <select
+                      value={secExcelForm.year}
+                      onChange={(e) => setSecExcelForm({ ...secExcelForm, year: e.target.value })}
+                      className="w-full p-2.5 bg-white text-slate-800 font-semibold rounded-xl border-0 focus:ring-2 focus:ring-sky-300"
+                    >
+                      {DataService.getYears().map(y => <option key={y} value={y}>{y} Year</option>)}
+                    </select>
+                  </div>
 
-                <button
-                  onClick={() => exportAttendanceExcel({ title: "Global Macro Report", branch: reportFilter.branch, records: filteredAttendance })}
-                  className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1 cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5" /> Excel
-                </button>
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-blue-100 mb-1">Section</label>
+                    <select
+                      value={secExcelForm.section}
+                      onChange={(e) => setSecExcelForm({ ...secExcelForm, section: e.target.value })}
+                      className="w-full p-2.5 bg-white text-slate-800 font-semibold rounded-xl border-0 focus:ring-2 focus:ring-sky-300"
+                    >
+                      {DataService.getSections().map(s => <option key={s} value={s}>Section {s}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-blue-100 mb-1">Semester</label>
+                    <select
+                      value={secExcelForm.semester}
+                      onChange={(e) => setSecExcelForm({ ...secExcelForm, semester: e.target.value })}
+                      className="w-full p-2.5 bg-white text-slate-800 font-semibold rounded-xl border-0 focus:ring-2 focus:ring-sky-300"
+                    >
+                      {DataService.getSemesters().map(s => <option key={s} value={s}>Semester {s}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="text-xs text-blue-100">
+                    Includes: Roll No, Student Name, all semester subject lecture columns (Attended / Held), total attended, and final percentage column.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleExportSectionMasterExcel}
+                    disabled={secExcelExporting}
+                    className="w-full sm:w-auto px-6 py-3.5 bg-white hover:bg-blue-50 text-blue-700 font-black rounded-xl text-sm transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    {secExcelExporting ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Generating Master Sheet...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-4 h-4" />
+                        <span>Download Section Master Attendance Sheet (.xlsx)</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-blue-50/60 border-y border-blue-100 text-[11px] font-bold text-slate-600 uppercase">
-                    <th className="py-3 px-4">Roll No</th>
-                    <th className="py-3 px-4">Student</th>
-                    <th className="py-3 px-4">Branch / Sec</th>
-                    <th className="py-3 px-4">Subject</th>
-                    <th className="py-3 px-4">Marked Date</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-xs">
-                  {filteredAttendance.length === 0 ? (
-                    <tr>
-                      <td colSpan="5" className="py-8 text-center text-slate-400">
-                        No attendance logs match the selected filter.
-                      </td>
+            {/* 2. STUDENT 360° NUMERICAL ATTENDANCE EXPLORER */}
+            <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 sm:p-8 shadow-sm border border-blue-100 space-y-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-100 pb-4 gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-blue-50 rounded-xl">
+                      <GraduationCap className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <h2 className="text-xl font-bold text-slate-900">Student 360° Attendance Explorer</h2>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Filter by class and select any student to view their exact subject-by-subject numerical attendance numbers and percentage.
+                  </p>
+                </div>
+                <span className="px-3 py-1 bg-sky-50 text-sky-800 text-xs font-mono font-bold rounded-xl border border-sky-200">
+                  Detailed Numerical Metrics
+                </span>
+              </div>
+
+              {/* Class & Student Filter Controls */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200 text-xs">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">Branch</label>
+                  <select
+                    value={explorerBranch}
+                    onChange={(e) => { setExplorerBranch(e.target.value); setExplorerStudentId(""); }}
+                    className="w-full p-2 bg-white border border-slate-200 rounded-xl font-semibold text-slate-800 cursor-pointer"
+                  >
+                    {DataService.getDepartments().map(b => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">Year</label>
+                  <select
+                    value={explorerYear}
+                    onChange={(e) => { setExplorerYear(e.target.value); setExplorerStudentId(""); }}
+                    className="w-full p-2 bg-white border border-slate-200 rounded-xl font-semibold text-slate-800 cursor-pointer"
+                  >
+                    {DataService.getYears().map(y => <option key={y} value={y}>{y} Year</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">Section</label>
+                  <select
+                    value={explorerSection}
+                    onChange={(e) => { setExplorerSection(e.target.value); setExplorerStudentId(""); }}
+                    className="w-full p-2 bg-white border border-slate-200 rounded-xl font-semibold text-slate-800 cursor-pointer"
+                  >
+                    {DataService.getSections().map(s => <option key={s} value={s}>Sec {s}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">Select Student</label>
+                  <select
+                    value={explorerStudentId}
+                    onChange={(e) => handleSelectExplorerStudent(e.target.value)}
+                    className="w-full p-2 bg-white border border-blue-300 rounded-xl font-bold text-blue-900 cursor-pointer focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">-- Choose Student ({explorerMatchingStudents.length}) --</option>
+                    {explorerMatchingStudents.map(s => (
+                      <option key={s.uid} value={s.uid}>
+                        {s.name} ({s.rollNo})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Selected Student Attendance Breakdown Display */}
+              {explorerLoading ? (
+                <div className="p-8 text-center text-slate-400 flex items-center justify-center gap-2">
+                  <RefreshCw className="w-5 h-5 animate-spin text-blue-600" />
+                  <span>Computing subject attendance records...</span>
+                </div>
+              ) : explorerStudentId && explorerStudentStats.length > 0 ? (() => {
+                const selectedStudent = users.find(u => u.uid === explorerStudentId);
+                const totalAtt = explorerStudentStats.reduce((a, c) => a + (c.attendedClasses || 0), 0);
+                const totalHeld = explorerStudentStats.reduce((a, c) => a + (c.totalClasses || 0), 0);
+                const overallPct = totalHeld > 0 ? Math.round((totalAtt / totalHeld) * 100) : 100;
+                const isEligible = overallPct >= 75;
+
+                return (
+                  <div className="space-y-6 pt-2">
+                    
+                    {/* Overview Banner Card */}
+                    <div className="p-5 rounded-2xl bg-gradient-to-r from-blue-50 via-sky-50 to-indigo-50 border border-blue-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-lg font-black text-slate-900">{selectedStudent?.name}</h3>
+                          <span className="px-2.5 py-0.5 bg-blue-100 text-blue-800 rounded-md text-xs font-mono font-bold">
+                            {selectedStudent?.rollNo}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600">
+                          {selectedStudent?.branch} • {selectedStudent?.year} Year • Section {selectedStudent?.section} (Semester {selectedStudent?.semester || "1"})
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <div className="text-xs text-slate-500 font-semibold">Total Attendance</div>
+                          <div className="text-lg font-black text-slate-900 font-mono">
+                            {totalAtt} <span className="text-xs text-slate-400 font-normal">/ {totalHeld} Classes</span>
+                          </div>
+                        </div>
+
+                        <div className={`p-3 rounded-2xl border text-center min-w-[100px] ${
+                          isEligible
+                            ? "bg-emerald-100/80 text-emerald-900 border-emerald-300"
+                            : "bg-red-100/80 text-red-900 border-red-300"
+                        }`}>
+                          <div className="text-xl font-black">{overallPct}%</div>
+                          <div className="text-[10px] font-bold uppercase tracking-wider">
+                            {isEligible ? "✅ Eligible" : "⚠️ Shortage"}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Numerical Breakdown Table */}
+                    <div className="overflow-x-auto border border-slate-200 rounded-2xl">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                            <th className="py-3 px-4">#</th>
+                            <th className="py-3 px-4">Subject Code</th>
+                            <th className="py-3 px-4">Subject Name</th>
+                            <th className="py-3 px-4 text-center">Total Held</th>
+                            <th className="py-3 px-4 text-center">Classes Attended</th>
+                            <th className="py-3 px-4 text-center">Percentage</th>
+                            <th className="py-3 px-4 text-center">BPUT Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 text-xs">
+                          {explorerStudentStats.map((sub, idx) => (
+                            <tr key={sub.code || idx} className="hover:bg-blue-50/40 transition-colors">
+                              <td className="py-3 px-4 text-slate-400 font-mono">{idx + 1}</td>
+                              <td className="py-3 px-4 font-mono font-bold text-blue-700">{sub.code || "—"}</td>
+                              <td className="py-3 px-4 font-bold text-slate-800">{sub.subjectName}</td>
+                              <td className="py-3 px-4 text-center font-mono font-semibold text-slate-700">
+                                {sub.totalClasses || 0}
+                              </td>
+                              <td className="py-3 px-4 text-center font-mono font-bold text-slate-900">
+                                {sub.attendedClasses || 0}
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                <span className={`px-2.5 py-1 rounded-lg font-mono font-extrabold text-xs ${
+                                  sub.percentage >= 75
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : "bg-red-100 text-red-800"
+                                }`}>
+                                  {sub.percentage || 0}%
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                  sub.isWarning
+                                    ? "bg-red-100 text-red-800 border border-red-200"
+                                    : "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                }`}>
+                                  {sub.isWarning ? "⚠️ Shortage (<75%)" : "✅ Eligible"}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })() : (
+                <div className="p-8 border border-dashed border-slate-200 rounded-2xl text-center text-xs text-slate-400 bg-slate-50">
+                  Select a student from the dropdown above to view their complete numerical attendance numbers and subject breakdown.
+                </div>
+              )}
+            </div>
+
+            {/* 3. GLOBAL ATTENDANCE AUDIT LOGS */}
+            <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 sm:p-8 shadow-sm border border-blue-100 space-y-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-100 pb-4 gap-4">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900">System Wide Attendance Scan Stream</h2>
+                  <p className="text-xs text-slate-500">Live attendance log entries across all branches and subjects</p>
+                </div>
+
+                {/* Filters & Export Buttons */}
+                <div className="flex items-center space-x-2">
+                  <select
+                    value={reportFilter.branch}
+                    onChange={(e) => setReportFilter({ ...reportFilter, branch: e.target.value })}
+                    className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
+                  >
+                    <option value="All">All Branches</option>
+                    {DataService.getDepartments().map(b => <option key={b} value={b}>{b}</option>)}
+                  </select>
+
+                  <button
+                    onClick={() => exportAttendancePDF({ title: "Global Macro Report", branch: reportFilter.branch, records: filteredAttendance })}
+                    className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl flex items-center gap-1 cursor-pointer"
+                  >
+                    <FileText className="w-3.5 h-3.5" /> PDF
+                  </button>
+
+                  <button
+                    onClick={() => exportAttendanceExcel({ title: "Global Macro Report", branch: reportFilter.branch, records: filteredAttendance })}
+                    className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1 cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Excel
+                  </button>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-blue-50/60 border-y border-blue-100 text-[11px] font-bold text-slate-600 uppercase">
+                      <th className="py-3 px-4">Roll No</th>
+                      <th className="py-3 px-4">Student</th>
+                      <th className="py-3 px-4">Branch / Sec</th>
+                      <th className="py-3 px-4">Subject</th>
+                      <th className="py-3 px-4">Marked Date</th>
                     </tr>
-                  ) : (
-                    filteredAttendance.slice().reverse().map((att) => (
-                      <tr key={att.id} className="hover:bg-blue-50/40">
-                        <td className="py-3 px-4 font-mono font-bold text-blue-700">{att.rollNo}</td>
-                        <td className="py-3 px-4 font-bold text-slate-900">{att.studentName}</td>
-                        <td className="py-3 px-4 text-slate-700">{att.branch} Sec-{att.section}</td>
-                        <td className="py-3 px-4 font-semibold text-slate-800">{att.subjectName}</td>
-                        <td className="py-3 px-4 text-slate-500 font-mono text-[11px]">
-                          {new Date(att.markedAt).toLocaleString()}
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs">
+                    {filteredAttendance.length === 0 ? (
+                      <tr>
+                        <td colSpan="5" className="py-8 text-center text-slate-400">
+                          No attendance logs match the selected filter.
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : (
+                      filteredAttendance.slice().reverse().map((att) => (
+                        <tr key={att.id} className="hover:bg-blue-50/40">
+                          <td className="py-3 px-4 font-mono font-bold text-blue-700">{att.rollNo}</td>
+                          <td className="py-3 px-4 font-bold text-slate-900">{att.studentName}</td>
+                          <td className="py-3 px-4 text-slate-700">{att.branch} Sec-{att.section}</td>
+                          <td className="py-3 px-4 font-semibold text-slate-800">{att.subjectName}</td>
+                          <td className="py-3 px-4 text-slate-500 font-mono text-[11px]">
+                            {new Date(att.markedAt).toLocaleString()}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}

@@ -641,3 +641,142 @@ export const exportClassTotalExcel = async ({ branch, year, section, semester, s
   const filename = `BEC_Total_Class_Attendance_${branch || "Class"}_Sec${section || "A"}_${Date.now()}.xlsx`;
   await downloadExcelWorkbook(wb, filename);
 };
+
+
+// ─────────────────────────────────────────────
+// SECTION MASTER ATTENDANCE EXCEL (All subjects + Final Overall %)
+// ─────────────────────────────────────────────
+
+export const exportSectionMasterAttendanceExcel = async ({
+  branch,
+  year,
+  section,
+  semester,
+  students,
+  subjects,
+  attendanceRecords,
+  sessions
+}) => {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "BEC Attendance System";
+  wb.created = new Date();
+
+  const ws = wb.addWorksheet("Section Master Attendance");
+
+  // Filter sessions that belong to this section & semester
+  const sectionSessions = (sessions || []).filter(s =>
+    s.branch === branch &&
+    s.year === year &&
+    s.section === section &&
+    String(s.semester) === String(semester)
+  );
+
+  // Total columns = 3 (S.No, Roll No, Student Name) + subjects.length + 4 (Total Attended, Total Held, Final Overall %, Status)
+  const totalCols = Math.max(7, 3 + (subjects?.length || 0) + 4);
+  applyCollegeBanner(ws, totalCols);
+
+  // Meta row at Row 3
+  const meta = ws.getRow(3);
+  meta.getCell(1).value = `Section Master Attendance Sheet | Branch: ${branch} | Year: ${year} | Section: ${section} | Semester: ${semester} | Total Students: ${students.length} | Generated: ${new Date().toLocaleString("en-IN")}`;
+  meta.getCell(1).font = { bold: true, size: 10, color: { argb: BEC_BLUE } };
+  meta.height = 22;
+
+  // Header titles
+  const headers = [
+    "S.No",
+    "Roll No",
+    "Student Name",
+    ...(subjects || []).map(s => `${s.code || s.name}`),
+    "Total Attended",
+    "Total Held",
+    "Overall %",
+    "BPUT Status"
+  ];
+
+  // Column widths
+  ws.getColumn(1).width = 6;
+  ws.getColumn(2).width = 16;
+  ws.getColumn(3).width = 24;
+  (subjects || []).forEach((s, idx) => {
+    ws.getColumn(4 + idx).width = 18;
+  });
+  const afterSubCol = 4 + (subjects?.length || 0);
+  ws.getColumn(afterSubCol).width = 15;
+  ws.getColumn(afterSubCol + 1).width = 14;
+  ws.getColumn(afterSubCol + 2).width = 14;
+  ws.getColumn(afterSubCol + 3).width = 18;
+
+  applyTableHeader(ws, 4, headers);
+
+  // Rows for each student
+  students.forEach((stud, i) => {
+    const rowNum = i + 5;
+    const row = ws.getRow(rowNum);
+    row.height = 24;
+
+    let studentTotalAttended = 0;
+    let studentTotalHeld = 0;
+
+    const subjectCells = (subjects || []).map(sub => {
+      // Find total sessions held for this subject in this section
+      const heldSessions = sectionSessions.filter(s =>
+        s.subjectId === sub.code ||
+        s.subjectId === sub.id ||
+        s.subjectName?.includes(sub.code) ||
+        s.subjectName?.includes(sub.name)
+      );
+      const totalHeld = heldSessions.length;
+
+      // Find attendance records for this student in this subject
+      const studentAtt = (attendanceRecords || []).filter(a =>
+        a.studentId === stud.uid || a.studentRoll === stud.rollNo || a.rollNo === stud.rollNo
+      ).filter(a =>
+        a.subjectId === sub.code ||
+        a.subjectId === sub.id ||
+        a.subjectName?.includes(sub.code) ||
+        a.subjectName?.includes(sub.name)
+      );
+
+      const attended = studentAtt.length;
+      studentTotalAttended += attended;
+      studentTotalHeld += totalHeld;
+
+      const subPct = totalHeld > 0 ? Math.round((attended / totalHeld) * 100) : 100;
+      return totalHeld > 0 ? `${attended} / ${totalHeld} (${subPct}%)` : `0 / 0 (100%)`;
+    });
+
+    const overallPct = studentTotalHeld > 0 ? Math.round((studentTotalAttended / studentTotalHeld) * 100) : 100;
+    const isEligible = overallPct >= 75;
+
+    const rowValues = [
+      i + 1,
+      stud.rollNo || "N/A",
+      stud.name || "N/A",
+      ...subjectCells,
+      studentTotalAttended,
+      studentTotalHeld,
+      `${overallPct}%`,
+      isEligible ? "✅ ELIGIBLE" : "❌ SHORTAGE (<75%)"
+    ];
+
+    rowValues.forEach((val, cIdx) => {
+      const cell = row.getCell(cIdx + 1);
+      cell.value = val;
+      cell.alignment = { vertical: "middle", horizontal: cIdx === 2 ? "left" : "center" };
+      if (cIdx === afterSubCol + 1) { // Overall %
+        cell.font = { bold: true, size: 10, color: { argb: isEligible ? GREEN : "FFCC0000" } };
+      }
+      if (cIdx === afterSubCol + 2) { // BPUT Status
+        cell.font = { bold: true, size: 9.5, color: { argb: isEligible ? GREEN : "FFCC0000" } };
+      }
+      if (i % 2 === 1) {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: STRIPE } };
+      }
+    });
+
+    row.commit();
+  });
+
+  const filename = `BEC_Section_Master_Attendance_${branch}_${year}_Sec${section}_Sem${semester}_${Date.now()}.xlsx`;
+  await downloadExcelWorkbook(wb, filename);
+};
