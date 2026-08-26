@@ -1,15 +1,7 @@
 import { db, isLiveFirebaseConfigured } from "../firebase/config";
-import { 
-  collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, addDoc 
+import {
+  collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc
 } from "firebase/firestore";
-
-const STORAGE_KEYS = {
-  USERS: "bec_users_db",
-  SUBJECTS: "bec_subjects_db",
-  SESSIONS: "bec_sessions_db",
-  ATTENDANCE: "bec_attendance_db",
-  DEPARTMENTS: "bec_departments_db"
-};
 
 // Initial Seed Data for Instant Local Development & Testing
 // BPUT (Biju Patnaik University of Technology) Branches
@@ -604,93 +596,7 @@ const DEFAULT_USERS = [
   }
 ];
 
-// Helper to seed localStorage
-const initializeLocalStorage = () => {
-  if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(DEFAULT_USERS));
-  }
-  if (!localStorage.getItem(STORAGE_KEYS.SUBJECTS)) {
-    localStorage.setItem(STORAGE_KEYS.SUBJECTS, JSON.stringify(DEFAULT_SUBJECTS));
-  }
-  if (!localStorage.getItem(STORAGE_KEYS.SESSIONS)) {
-    // Seed past 20 DBMS sessions for CSE/2nd/A/3 to enable realistic % calculation
-    const pastSessions = [];
-    const pastAttendance = [];
-    const subjectsToSeed = [
-      { id: "sub_dbms", name: "Database Management System", count: 20, rahulAttended: 17, priyaAttended: 14 },
-      { id: "sub_maths3", name: "Mathematics-III", count: 18, rahulAttended: 13, priyaAttended: 16 }, // 13/18 = 72% (Red Alert!)
-      { id: "sub_digital", name: "Digital Electronics", count: 15, rahulAttended: 14, priyaAttended: 15 },
-      { id: "sub_dsa", name: "Data Structures", count: 22, rahulAttended: 20, priyaAttended: 18 }
-    ];
-
-    subjectsToSeed.forEach(sub => {
-      for (let i = 1; i <= sub.count; i++) {
-        const sessId = `sess_${sub.id}_${i}`;
-        const sessDate = new Date(Date.now() - (sub.count - i) * 86400000 * 2).toISOString();
-        pastSessions.push({
-          id: sessId,
-          branch: "CSE",
-          year: "2nd",
-          section: "A",
-          semester: "3",
-          subjectId: sub.id,
-          subjectName: sub.name,
-          teacherId: "teacher_01",
-          teacherName: "Dr. Rajesh Sharma",
-          token: `tok_${i}`,
-          tokenGeneratedAt: Date.now(),
-          expiresAt: Date.now() + 600000,
-          isActive: false,
-          createdAt: sessDate
-        });
-
-        // Add Attendance records
-        if (i <= sub.rahulAttended) {
-          pastAttendance.push({
-            id: `${sessId}_student_rahul`,
-            sessionId: sessId,
-            studentId: "student_rahul",
-            rollNo: "2201CS045",
-            studentName: "Rahul Kumar",
-            subjectId: sub.id,
-            subjectName: sub.name,
-            branch: "CSE",
-            year: "2nd",
-            section: "A",
-            semester: "3",
-            markedAt: sessDate,
-            status: "present"
-          });
-        }
-
-        if (i <= sub.priyaAttended) {
-          pastAttendance.push({
-            id: `${sessId}_student_priya`,
-            sessionId: sessId,
-            studentId: "student_priya",
-            rollNo: "2201CS048",
-            studentName: "Priya Patel",
-            subjectId: sub.id,
-            subjectName: sub.name,
-            branch: "CSE",
-            year: "2nd",
-            section: "A",
-            semester: "3",
-            markedAt: sessDate,
-            status: "present"
-          });
-        }
-      }
-    });
-
-    localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(pastSessions));
-    localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(pastAttendance));
-  }
-};
-
-initializeLocalStorage();
-
-// --- DATA SERVICE API ---
+// ─── DATA SERVICE API (Firebase Firestore Only) ───────────────────────────────
 
 export const DataService = {
   // --- USERS ---
@@ -698,14 +604,11 @@ export const DataService = {
     if (isLiveFirebaseConfigured && db) {
       try {
         const snap = await getDocs(collection(db, "users"));
-        return snap.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
+        return snap.docs.map(d => ({ uid: d.id, ...d.data() }));
       } catch (e) {
-        console.warn("Firestore SDK error, trying REST fallback:", e);
-        // REST API fallback — works even when user is unauthenticated
-        // (solves chicken-and-egg: need users to auth, need auth to get users)
+        console.warn("Firestore SDK getUsers failed, trying REST:", e.message);
         try {
-          const projectId = "bec-at-system";
-          const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users`;
+          const url = `https://firestore.googleapis.com/v1/projects/bec-at-system/databases/(default)/documents/users`;
           const res = await fetch(url);
           if (res.ok) {
             const data = await res.json();
@@ -721,195 +624,126 @@ export const DataService = {
             }
           }
         } catch (restErr) {
-          console.warn("Firestore REST fallback also failed:", restErr);
+          console.warn("Firestore REST fallback also failed:", restErr.message);
         }
       }
     }
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || "[]");
+    throw new Error("Firebase is not configured. Cannot load users.");
   },
 
   async getUserById(uid) {
-    const users = await this.getUsers();
-    return users.find(u => u.uid === uid) || null;
+    if (isLiveFirebaseConfigured && db) {
+      const snap = await getDoc(doc(db, "users", uid));
+      return snap.exists() ? { uid: snap.id, ...snap.data() } : null;
+    }
+    throw new Error("Firebase is not configured.");
   },
 
   async createUser(userData) {
     if (isLiveFirebaseConfigured && db) {
-      try {
-        await setDoc(doc(db, "users", userData.uid), userData);
-        return userData;
-      } catch (e) {
-        console.warn("Firestore user create failed, saving local:", e);
-      }
+      await setDoc(doc(db, "users", userData.uid), userData);
+      return userData;
     }
-    const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || "[]");
-    users.push(userData);
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-    return userData;
+    throw new Error("Firebase is not configured. Cannot create user.");
   },
 
   async updateUserStatus(uid, status) {
     if (isLiveFirebaseConfigured && db) {
-      try {
-        await updateDoc(doc(db, "users", uid), { status });
-      } catch (e) {
-        console.warn("Firestore update user status failed:", e);
-      }
+      await updateDoc(doc(db, "users", uid), { status });
+      return true;
     }
-    const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || "[]");
-    const idx = users.findIndex(u => u.uid === uid);
-    if (idx !== -1) {
-      users[idx].status = status;
-      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-    }
-    return true;
+    throw new Error("Firebase is not configured. Cannot update user status.");
   },
 
   async deleteUser(uid) {
     if (isLiveFirebaseConfigured && db) {
-      try {
-        await deleteDoc(doc(db, "users", uid));
-      } catch (e) {
-        console.warn("Firestore delete user failed:", e);
-      }
+      await deleteDoc(doc(db, "users", uid));
+      return true;
     }
-    let users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || "[]");
-    users = users.filter(u => u.uid !== uid);
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-    return true;
+    throw new Error("Firebase is not configured. Cannot delete user.");
   },
 
   // --- SUBJECTS ---
   async getSubjects() {
     if (isLiveFirebaseConfigured && db) {
-      try {
-        const snap = await getDocs(collection(db, "subjects"));
-        return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      } catch (e) {
-        console.warn("Firestore subjects fetch failed:", e);
-      }
+      const snap = await getDocs(collection(db, "subjects"));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
     }
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.SUBJECTS) || "[]");
+    throw new Error("Firebase is not configured. Cannot load subjects.");
   },
 
   async createSubject(subjectData) {
-    const newId = `sub_${Date.now()}`;
-    const newSub = { id: newId, ...subjectData };
     if (isLiveFirebaseConfigured && db) {
-      try {
-        await setDoc(doc(db, "subjects", newId), newSub);
-        return newSub;
-      } catch (e) {
-        console.warn("Firestore subject create failed:", e);
-      }
+      const newId = `sub_${Date.now()}`;
+      const newSub = { id: newId, ...subjectData };
+      await setDoc(doc(db, "subjects", newId), newSub);
+      return newSub;
     }
-    const subjects = JSON.parse(localStorage.getItem(STORAGE_KEYS.SUBJECTS) || "[]");
-    subjects.push(newSub);
-    localStorage.setItem(STORAGE_KEYS.SUBJECTS, JSON.stringify(subjects));
-    return newSub;
+    throw new Error("Firebase is not configured. Cannot create subject.");
   },
 
   async deleteSubject(subjectId) {
     if (isLiveFirebaseConfigured && db) {
-      try {
-        await deleteDoc(doc(db, "subjects", subjectId));
-      } catch (e) {
-        console.warn("Firestore delete subject failed:", e);
-      }
+      await deleteDoc(doc(db, "subjects", subjectId));
+      return true;
     }
-    let subjects = JSON.parse(localStorage.getItem(STORAGE_KEYS.SUBJECTS) || "[]");
-    subjects = subjects.filter(s => s.id !== subjectId);
-    localStorage.setItem(STORAGE_KEYS.SUBJECTS, JSON.stringify(subjects));
-    return true;
+    throw new Error("Firebase is not configured. Cannot delete subject.");
   },
 
   // --- SESSIONS ---
   async getSessions() {
     if (isLiveFirebaseConfigured && db) {
-      try {
-        const snap = await getDocs(collection(db, "sessions"));
-        return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      } catch (e) {
-        console.warn("Firestore sessions fetch failed:", e);
-      }
+      const snap = await getDocs(collection(db, "sessions"));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
     }
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.SESSIONS) || "[]");
+    throw new Error("Firebase is not configured. Cannot load sessions.");
   },
 
   async createSession(sessionData) {
-    const sessionId = `sess_${Date.now()}`;
-    const newSession = {
-      id: sessionId,
-      ...sessionData,
-      isActive: true,
-      createdAt: new Date().toISOString()
-    };
-
     if (isLiveFirebaseConfigured && db) {
-      try {
-        await setDoc(doc(db, "sessions", sessionId), newSession);
-        return newSession;
-      } catch (e) {
-        console.warn("Firestore create session failed:", e);
-      }
+      const sessionId = `sess_${Date.now()}`;
+      const newSession = {
+        id: sessionId,
+        ...sessionData,
+        isActive: true,
+        createdAt: new Date().toISOString()
+      };
+      await setDoc(doc(db, "sessions", sessionId), newSession);
+      return newSession;
     }
-
-    const sessions = JSON.parse(localStorage.getItem(STORAGE_KEYS.SESSIONS) || "[]");
-    sessions.push(newSession);
-    localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(sessions));
-    return newSession;
+    throw new Error("Firebase is not configured. Cannot create session.");
   },
 
   async updateSessionToken(sessionId, token) {
-    const updateData = { token, tokenGeneratedAt: Date.now() };
     if (isLiveFirebaseConfigured && db) {
-      try {
-        await updateDoc(doc(db, "sessions", sessionId), updateData);
-      } catch (e) {
-        console.warn("Firestore update session token failed:", e);
-      }
+      await updateDoc(doc(db, "sessions", sessionId), { token, tokenGeneratedAt: Date.now() });
+      return true;
     }
-    const sessions = JSON.parse(localStorage.getItem(STORAGE_KEYS.SESSIONS) || "[]");
-    const idx = sessions.findIndex(s => s.id === sessionId);
-    if (idx !== -1) {
-      sessions[idx].token = token;
-      sessions[idx].tokenGeneratedAt = Date.now();
-      localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(sessions));
-    }
+    throw new Error("Firebase is not configured. Cannot update session token.");
   },
 
   async endSession(sessionId) {
     if (isLiveFirebaseConfigured && db) {
-      try {
-        await updateDoc(doc(db, "sessions", sessionId), { isActive: false });
-      } catch (e) {
-        console.warn("Firestore end session failed:", e);
-      }
+      await updateDoc(doc(db, "sessions", sessionId), { isActive: false });
+      return true;
     }
-    const sessions = JSON.parse(localStorage.getItem(STORAGE_KEYS.SESSIONS) || "[]");
-    const idx = sessions.findIndex(s => s.id === sessionId);
-    if (idx !== -1) {
-      sessions[idx].isActive = false;
-      localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(sessions));
-    }
-    return true;
+    throw new Error("Firebase is not configured. Cannot end session.");
   },
 
   // --- ATTENDANCE ---
   async getAttendance() {
     if (isLiveFirebaseConfigured && db) {
-      try {
-        const snap = await getDocs(collection(db, "attendance"));
-        return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      } catch (e) {
-        console.warn("Firestore attendance fetch failed:", e);
-      }
+      const snap = await getDocs(collection(db, "attendance"));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
     }
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.ATTENDANCE) || "[]");
+    throw new Error("Firebase is not configured. Cannot load attendance.");
   },
 
   async markAttendance({ student, session, token, livePhoto }) {
-    // 1. Verify student branch + year + section exact match
+    if (!isLiveFirebaseConfigured || !db) {
+      throw new Error("Firebase is not configured. Cannot mark attendance.");
+    }
+
     if (
       student.branch !== session.branch ||
       student.year !== session.year ||
@@ -919,23 +753,13 @@ export const DataService = {
         `This class is not for your section! Required: ${session.branch} ${session.year} Sec ${session.section}`
       );
     }
-
-    // 2. Check if session is active & token valid
-    if (!session.isActive) {
-      throw new Error("This class session has ended.");
-    }
-    if (session.token !== token) {
-      throw new Error("QR Expired or Invalid token!");
-    }
+    if (!session.isActive) throw new Error("This class session has ended.");
+    if (session.token !== token) throw new Error("QR Expired or Invalid token!");
 
     const attendanceRecords = await this.getAttendance();
     const docId = `${session.id}_${student.uid}`;
 
-    // 3. Check duplicate attendance
-    const alreadyMarked = attendanceRecords.some(
-      a => a.sessionId === session.id && a.studentId === student.uid
-    );
-    if (alreadyMarked) {
+    if (attendanceRecords.some(a => a.sessionId === session.id && a.studentId === student.uid)) {
       throw new Error("Attendance Already Marked for this class!");
     }
 
@@ -957,17 +781,7 @@ export const DataService = {
       photoVerified: !!livePhoto
     };
 
-    if (isLiveFirebaseConfigured && db) {
-      try {
-        await setDoc(doc(db, "attendance", docId), newRecord);
-        return newRecord;
-      } catch (e) {
-        console.warn("Firestore mark attendance failed:", e);
-      }
-    }
-
-    attendanceRecords.push(newRecord);
-    localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(attendanceRecords));
+    await setDoc(doc(db, "attendance", docId), newRecord);
     return newRecord;
   },
 
@@ -977,61 +791,35 @@ export const DataService = {
     const allAttendance = await this.getAttendance();
     const allSubjects = await this.getSubjects();
 
-    // 1. Get standard BPUT Curriculum subjects for student's branch & semester
     const bputList = this.getBputSubjectsForBranch(student?.branch, student?.semester) || [];
-    
-    // 2. Map of distinct subjects to track
     const subjectsMap = new Map();
 
-    // Add BPUT catalog subjects
     bputList.forEach(b => {
       const key = b.code || b.name;
-      subjectsMap.set(key, {
-        id: b.code || b.name,
-        name: b.name,
-        code: b.code
-      });
+      subjectsMap.set(key, { id: b.code || b.name, name: b.name, code: b.code });
     });
 
-    // 3. Add any subjects from class sessions held for this student's branch + year + section
     const classSessions = allSessions.filter(
-      sess =>
-        sess.branch === student?.branch &&
-        sess.year === student?.year &&
-        sess.section === student?.section
+      sess => sess.branch === student?.branch && sess.year === student?.year && sess.section === student?.section
     );
-
     classSessions.forEach(sess => {
       const key = sess.subjectId || sess.subjectName;
       if (!subjectsMap.has(key)) {
-        subjectsMap.set(key, {
-          id: sess.subjectId || key,
-          name: sess.subjectName || key,
-          code: sess.subjectId || ""
-        });
+        subjectsMap.set(key, { id: sess.subjectId || key, name: sess.subjectName || key, code: sess.subjectId || "" });
       }
     });
 
-    // 4. Add any custom subjects registered in database for this branch & semester
     const customBranchSubs = allSubjects.filter(
       s => s.branch === student?.branch && (!s.semester || s.semester === student?.semester)
     );
     customBranchSubs.forEach(s => {
       const key = s.code || s.id || s.name;
       if (!subjectsMap.has(key)) {
-        subjectsMap.set(key, {
-          id: s.id,
-          name: s.name,
-          code: s.code || ""
-        });
+        subjectsMap.set(key, { id: s.id, name: s.name, code: s.code || "" });
       }
     });
 
-    // 5. Calculate percentage and statistics per subject
-    const subjectList = Array.from(subjectsMap.values());
-
-    const stats = subjectList.map(sub => {
-      // Total classes held for this subject for this student's branch + year + section
+    const stats = Array.from(subjectsMap.values()).map(sub => {
       const totalClasses = allSessions.filter(
         sess =>
           sess.branch === student?.branch &&
@@ -1040,16 +828,13 @@ export const DataService = {
           (sess.subjectId === sub.id || sess.subjectName === sub.name || sess.subjectId === sub.code)
       ).length;
 
-      // Attended classes by this student for this subject
       const attendedClasses = allAttendance.filter(
         att =>
           (att.studentId === student?.uid || (att.rollNo && att.rollNo === student?.rollNo)) &&
           (att.subjectId === sub.id || att.subjectName === sub.name || att.subjectId === sub.code)
       ).length;
 
-      const percentage = totalClasses > 0
-        ? Math.round((attendedClasses / totalClasses) * 100)
-        : 100;
+      const percentage = totalClasses > 0 ? Math.round((attendedClasses / totalClasses) * 100) : 100;
 
       return {
         subjectId: sub.id,
@@ -1065,77 +850,46 @@ export const DataService = {
     return stats;
   },
 
-  // --- ADMIN BULK ATTENDANCE (bypasses QR/token) ---
+  // --- ADMIN BULK ATTENDANCE ---
   async adminBulkMarkAttendance({ branch, year, section, semester, subjectId, subjectName, studentIds, adminName }) {
+    if (!isLiveFirebaseConfigured || !db) throw new Error("Firebase is not configured.");
+
     const allUsers = await this.getUsers();
     const attendanceRecords = await this.getAttendance();
 
-    // Create a virtual session for record-keeping
     const sessionId = `admin_sess_${Date.now()}`;
     const newSession = {
-      id: sessionId,
-      branch,
-      year,
-      section,
-      semester,
-      subjectId,
-      subjectName,
-      teacherId: "admin",
-      teacherName: adminName || "System Administrator",
-      token: "admin_direct",
-      tokenGeneratedAt: Date.now(),
-      isActive: false,
-      createdAt: new Date().toISOString(),
-      markedByAdmin: true
+      id: sessionId, branch, year, section, semester, subjectId, subjectName,
+      teacherId: "admin", teacherName: adminName || "System Administrator",
+      token: "admin_direct", tokenGeneratedAt: Date.now(),
+      isActive: false, createdAt: new Date().toISOString(), markedByAdmin: true
     };
-
-    // Save session
-    if (isLiveFirebaseConfigured && db) {
-      try { await setDoc(doc(db, "sessions", sessionId), newSession); } catch (e) { console.warn(e); }
-    }
-    const sessions = JSON.parse(localStorage.getItem(STORAGE_KEYS.SESSIONS) || "[]");
-    sessions.push(newSession);
-    localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(sessions));
+    await setDoc(doc(db, "sessions", sessionId), newSession);
 
     const newRecords = [];
     for (const studentId of studentIds) {
       const student = allUsers.find(u => u.uid === studentId);
       if (!student) continue;
-
       const docId = `${sessionId}_${studentId}`;
-      // Skip if already marked
       if (attendanceRecords.some(a => a.sessionId === sessionId && a.studentId === studentId)) continue;
 
       const record = {
-        id: docId,
-        sessionId,
-        studentId,
-        studentName: student.name,
-        rollNo: student.rollNo,
-        branch: student.branch,
-        year: student.year,
-        section: student.section,
-        semester,
-        subjectId,
-        subjectName,
-        markedAt: new Date().toISOString(),
-        status: "present",
-        markedByAdmin: true
+        id: docId, sessionId, studentId,
+        studentName: student.name, rollNo: student.rollNo,
+        branch: student.branch, year: student.year, section: student.section,
+        semester, subjectId, subjectName,
+        markedAt: new Date().toISOString(), status: "present", markedByAdmin: true
       };
-
-      if (isLiveFirebaseConfigured && db) {
-        try { await setDoc(doc(db, "attendance", docId), record); } catch (e) { console.warn(e); }
-      }
-      attendanceRecords.push(record);
+      await setDoc(doc(db, "attendance", docId), record);
       newRecords.push(record);
     }
-
-    localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(attendanceRecords));
     return { session: newSession, records: newRecords, count: newRecords.length };
   },
 
-  // --- ADMIN MEDICAL / SPECIAL OVERRIDE (BOOST TO 75%+) ---
+  // --- ADMIN MEDICAL / BOOST ATTENDANCE ---
   async adminBoostAttendanceToTarget({ studentId, targetPercentage = 75, reason = "Medical Grounds / Approved Exemption", adminName = "System Administrator" }) {
+    if (!isLiveFirebaseConfigured || !db) throw new Error("Firebase is not configured.");
+
     const student = await this.getUserById(studentId);
     if (!student) throw new Error("Student not found!");
 
@@ -1143,7 +897,6 @@ export const DataService = {
     const allAttendance = await this.getAttendance();
     const allSubjects = await this.getSubjects();
 
-    // Relevant subjects for student's branch & semester
     const branchSubjects = allSubjects.filter(
       s => s.branch === student.branch && (s.semester === student.semester || !s.semester)
     );
@@ -1153,19 +906,15 @@ export const DataService = {
     const subjectsBoosted = [];
 
     for (const sub of branchSubjects) {
-      // Find all sessions held for this student's class and subject
       const subjectSessions = allSessions.filter(
         sess =>
-          sess.branch === student.branch &&
-          sess.year === student.year &&
-          sess.section === student.section &&
-          sess.subjectId === sub.id
+          sess.branch === student.branch && sess.year === student.year &&
+          sess.section === student.section && sess.subjectId === sub.id
       );
 
       const totalClasses = subjectSessions.length;
       if (totalClasses === 0) continue;
 
-      // Attended sessions
       const attendedSessionIds = new Set(
         updatedRecords
           .filter(att => att.studentId === student.uid && att.subjectId === sub.id)
@@ -1178,89 +927,46 @@ export const DataService = {
       if (currentCount < targetCount) {
         const needed = targetCount - currentCount;
         let addedForThisSub = 0;
-
-        // 1. First find existing class sessions the student missed
         const missedSessions = subjectSessions.filter(s => !attendedSessionIds.has(s.id));
 
         for (let i = 0; i < needed && i < missedSessions.length; i++) {
           const sess = missedSessions[i];
           const docId = `${sess.id}_${student.uid}`;
           const record = {
-            id: docId,
-            sessionId: sess.id,
-            studentId: student.uid,
-            studentName: student.name,
-            rollNo: student.rollNo,
-            branch: student.branch,
-            year: student.year,
-            section: student.section,
-            semester: student.semester || sub.semester,
-            subjectId: sub.id,
-            subjectName: sub.name,
-            markedAt: new Date().toISOString(),
-            status: "present",
-            markedByAdmin: true,
-            reason: reason,
-            medicalExemption: true
+            id: docId, sessionId: sess.id, studentId: student.uid,
+            studentName: student.name, rollNo: student.rollNo,
+            branch: student.branch, year: student.year, section: student.section,
+            semester: student.semester || sub.semester, subjectId: sub.id, subjectName: sub.name,
+            markedAt: new Date().toISOString(), status: "present",
+            markedByAdmin: true, reason, medicalExemption: true
           };
-
-          if (isLiveFirebaseConfigured && db) {
-            try { await setDoc(doc(db, "attendance", docId), record); } catch (e) {}
-          }
+          await setDoc(doc(db, "attendance", docId), record);
           updatedRecords.push(record);
           newAddedRecords.push(record);
           addedForThisSub++;
         }
 
-        // 2. If still needed, create virtual compensatory exemption records
         while (addedForThisSub < needed) {
-          const virtualSessionId = `med_sess_${sub.id}_${Date.now()}_${addedForThisSub}`;
-          const virtualSession = {
-            id: virtualSessionId,
-            branch: student.branch,
-            year: student.year,
-            section: student.section,
-            semester: student.semester || sub.semester,
-            subjectId: sub.id,
-            subjectName: sub.name,
-            teacherId: "admin",
-            teacherName: adminName,
-            token: "medical_direct",
-            tokenGeneratedAt: Date.now(),
-            isActive: false,
-            createdAt: new Date().toISOString(),
-            markedByAdmin: true,
-            isCompensatory: true
+          const vSessId = `med_sess_${sub.id}_${Date.now()}_${addedForThisSub}`;
+          const vSess = {
+            id: vSessId, branch: student.branch, year: student.year, section: student.section,
+            semester: student.semester || sub.semester, subjectId: sub.id, subjectName: sub.name,
+            teacherId: "admin", teacherName: adminName, token: "medical_direct",
+            tokenGeneratedAt: Date.now(), isActive: false, createdAt: new Date().toISOString(),
+            markedByAdmin: true, isCompensatory: true
           };
+          await setDoc(doc(db, "sessions", vSessId), vSess);
 
-          if (isLiveFirebaseConfigured && db) {
-            try { await setDoc(doc(db, "sessions", virtualSessionId), virtualSession); } catch (e) {}
-          }
-          allSessions.push(virtualSession);
-
-          const docId = `${virtualSessionId}_${student.uid}`;
+          const docId = `${vSessId}_${student.uid}`;
           const record = {
-            id: docId,
-            sessionId: virtualSessionId,
-            studentId: student.uid,
-            studentName: student.name,
-            rollNo: student.rollNo,
-            branch: student.branch,
-            year: student.year,
-            section: student.section,
-            semester: student.semester || sub.semester,
-            subjectId: sub.id,
-            subjectName: sub.name,
-            markedAt: new Date().toISOString(),
-            status: "present",
-            markedByAdmin: true,
-            reason: reason,
-            medicalExemption: true
+            id: docId, sessionId: vSessId, studentId: student.uid,
+            studentName: student.name, rollNo: student.rollNo,
+            branch: student.branch, year: student.year, section: student.section,
+            semester: student.semester || sub.semester, subjectId: sub.id, subjectName: sub.name,
+            markedAt: new Date().toISOString(), status: "present",
+            markedByAdmin: true, reason, medicalExemption: true
           };
-
-          if (isLiveFirebaseConfigured && db) {
-            try { await setDoc(doc(db, "attendance", docId), record); } catch (e) {}
-          }
+          await setDoc(doc(db, "attendance", docId), record);
           updatedRecords.push(record);
           newAddedRecords.push(record);
           addedForThisSub++;
@@ -1275,35 +981,22 @@ export const DataService = {
       }
     }
 
-    localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(allSessions));
-    localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(updatedRecords));
-
     return {
-      studentName: student.name,
-      rollNo: student.rollNo,
-      targetPercentage,
-      totalRecordsAdded: newAddedRecords.length,
-      subjectsBoosted
+      studentName: student.name, rollNo: student.rollNo,
+      targetPercentage, totalRecordsAdded: newAddedRecords.length, subjectsBoosted
     };
   },
 
   // --- BPUT CURRICULUM HELPERS ---
-  getBputCurriculum() {
-    return BPUT_CURRICULUM;
-  },
+  getBputCurriculum() { return BPUT_CURRICULUM; },
 
   getBputSubjectsForBranch(branch, semester) {
     const results = [];
-    // Add common subjects for semester 1 & 2
     if (semester === "1" || semester === "2") {
-      const common = BPUT_CURRICULUM.common?.[semester] || [];
-      results.push(...common);
+      results.push(...(BPUT_CURRICULUM.common?.[semester] || []));
     }
-    // Add branch-specific subjects
     const branchData = BPUT_CURRICULUM[branch];
-    if (branchData && branchData[semester]) {
-      results.push(...branchData[semester]);
-    }
+    if (branchData?.[semester]) results.push(...branchData[semester]);
     return results;
   },
 
