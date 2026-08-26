@@ -45,50 +45,59 @@ export const isCloudinaryConfigured = () => {
 export const uploadPhotoToCloudinary = async (base64Image, folder = "bec_attendance", tags = ["temp_30days"]) => {
   const config = getCloudinaryConfig();
 
-  if (!config.cloudName || !config.uploadPreset) {
-    throw new Error("Cloudinary is not configured. Please set VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET to enable photo uploads.");
+  if (!config.cloudName) {
+    throw new Error("Cloudinary is not configured.");
   }
 
-  try {
-    const formData = new FormData();
-    formData.append("file", base64Image);
-    formData.append("upload_preset", config.uploadPreset);
-    if (folder) formData.append("folder", folder);
-    if (tags && tags.length > 0) formData.append("tags", tags.join(","));
+  // Presets to try in order (underscores first, then spaces)
+  const presetsToTry = [
+    config.uploadPreset || "attendance_system_BEC",
+    "attendance system BEC",
+    "attendance_system_BEC"
+  ];
 
-    const endpoint = `https://api.cloudinary.com/v1_1/${config.cloudName}/image/upload`;
+  const uniquePresets = [...new Set(presetsToTry)];
 
-    const response = await fetch(endpoint, {
-      method: "POST",
-      body: formData
-    });
+  let lastError = null;
 
-    let data = {};
+  for (const preset of uniquePresets) {
     try {
-      data = await response.json();
-    } catch (e) {
-      data = {};
-    }
+      const formData = new FormData();
+      formData.append("file", base64Image);
+      formData.append("upload_preset", preset);
+      if (folder) formData.append("folder", folder);
+      if (tags && tags.length > 0) formData.append("tags", tags.join(","));
 
-    if (!response.ok) {
-      const cloudError = data?.error?.message || "Cloudinary upload failed.";
-      if (cloudError.toLowerCase().includes("upload preset") || cloudError.toLowerCase().includes("preset")) {
-        throw new Error("Cloudinary upload preset not found. Create an unsigned upload preset named attendance_system_BEC in Cloudinary and keep the same name in .env.");
+      const endpoint = `https://api.cloudinary.com/v1_1/${config.cloudName}/image/upload`;
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        body: formData
+      });
+
+      let data = {};
+      try {
+        data = await response.json();
+      } catch (e) {
+        data = {};
       }
-      throw new Error(cloudError);
-    }
 
-    if (data.secure_url) {
-      return {
-        url: data.secure_url,
-        publicId: data.public_id,
-        isCloudinary: true
-      };
-    }
+      if (response.ok && data.secure_url) {
+        return {
+          url: data.secure_url,
+          publicId: data.public_id,
+          isCloudinary: true
+        };
+      }
 
-    throw new Error("Cloudinary image upload failed.");
-  } catch (error) {
-    console.error("Cloudinary upload failed:", error);
-    throw new Error(error?.message || "Cloudinary image upload failed.");
+      const cloudError = data?.error?.message || "Upload failed";
+      lastError = new Error(cloudError);
+      console.warn(`Cloudinary upload with preset "${preset}" returned:`, cloudError);
+    } catch (err) {
+      lastError = err;
+      console.warn(`Cloudinary upload attempt with preset "${preset}" failed:`, err.message);
+    }
   }
+
+  throw lastError || new Error("Cloudinary image upload failed.");
 };
