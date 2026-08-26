@@ -8,10 +8,13 @@ export const Signup = () => {
   const [formData, setFormData] = useState({
     name: "",
     rollNo: "",
+    dob: "",
+    gender: "Male",
+    phone: "",
     branch: "CSE",
-    year: "2nd",
+    year: "1st",
     section: "A",
-    semester: "3",
+    semester: "1",
     email: "",
     password: ""
   });
@@ -118,10 +121,57 @@ export const Signup = () => {
                   type="text"
                   name="rollNo"
                   required
-                  placeholder="2201CS045"
+                  placeholder="2301316029"
                   value={formData.rollNo}
                   onChange={handleChange}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono uppercase focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Date of Birth, Gender & Phone */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-blue-50/40 p-3.5 rounded-2xl border border-blue-100">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                  Date of Birth
+                </label>
+                <input
+                  type="date"
+                  name="dob"
+                  required
+                  value={formData.dob}
+                  onChange={handleChange}
+                  className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                  Gender
+                </label>
+                <select
+                  name="gender"
+                  value={formData.gender}
+                  onChange={handleChange}
+                  className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer"
+                >
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                  Contact Phone
+                </label>
+                <input
+                  type="tel"
+                  name="phone"
+                  placeholder="9876543210"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
               </div>
             </div>

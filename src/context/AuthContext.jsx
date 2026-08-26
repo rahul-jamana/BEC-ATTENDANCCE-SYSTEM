@@ -75,6 +75,9 @@ export const AuthProvider = ({ children }) => {
       year: studentData.year,
       section: studentData.section,
       semester: studentData.semester,
+      dob: studentData.dob || "",
+      gender: studentData.gender || "Male",
+      phone: studentData.phone || "",
       role: "student",
       status: "approved",
       createdAt: new Date().toISOString()

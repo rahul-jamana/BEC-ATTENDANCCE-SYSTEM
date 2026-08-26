@@ -54,6 +54,9 @@ export const AyushMasterPortal = () => {
     year: "1st",
     section: "A",
     semester: "1",
+    dob: "",
+    gender: "Male",
+    phone: "",
     department: "CSE",
     subjectName: "",
     status: "approved"
@@ -72,10 +75,8 @@ export const AyushMasterPortal = () => {
   };
 
   useEffect(() => {
-    if (isAuthenticated) {
-      loadAllUsers();
-    }
-  }, [isAuthenticated]);
+    loadAllUsers();
+  }, []);
 
   // Master Gate Login Handler
   const handleMasterLogin = (e) => {
@@ -164,6 +165,9 @@ export const AyushMasterPortal = () => {
           year: form.year,
           section: form.section,
           semester: form.semester,
+          dob: form.dob || "",
+          gender: form.gender || "Male",
+          phone: form.phone || ""
         };
       } else if (createRole === "teacher") {
         newProfile = {
@@ -705,6 +709,43 @@ export const AyushMasterPortal = () => {
                       >
                         {DataService.getSemesters().map(s => <option key={s} value={s}>Sem {s}</option>)}
                       </select>
+                    </div>
+                  </div>
+
+                  {/* Date of Birth, Gender, Phone */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-blue-100">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">Date of Birth</label>
+                      <input
+                        type="date"
+                        value={form.dob}
+                        onChange={(e) => setForm({ ...form, dob: e.target.value })}
+                        className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 cursor-pointer"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">Gender</label>
+                      <select
+                        value={form.gender}
+                        onChange={(e) => setForm({ ...form, gender: e.target.value })}
+                        className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 cursor-pointer"
+                      >
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">Contact Phone</label>
+                      <input
+                        type="tel"
+                        placeholder="9876543210"
+                        value={form.phone}
+                        onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                        className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800"
+                      />
                     </div>
                   </div>
                 </div>
