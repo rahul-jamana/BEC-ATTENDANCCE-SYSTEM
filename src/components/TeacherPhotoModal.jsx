@@ -82,9 +82,9 @@ export const TeacherPhotoModal = ({ isOpen, onClose, onConfirmPhoto, sessionDeta
       const cdnResult = await uploadPhotoToCloudinary(photoDataUrl, "faculty_live_photos", ["faculty", "temp_30days"]);
       onConfirmPhoto(cdnResult.url);
     } catch (err) {
-      setCameraError(err.message || "Teacher photo upload failed. Please configure Cloudinary first.");
+      console.warn("Cloudinary upload skipped, using live faculty photo data:", err.message);
       if (onConfirmPhoto) {
-        onConfirmPhoto(null);
+        onConfirmPhoto(photoDataUrl);
       }
     } finally {
       setIsUploading(false);

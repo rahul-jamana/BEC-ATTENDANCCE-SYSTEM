@@ -71,6 +71,9 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
     setIsSelfieCameraActive(false);
   };
 
@@ -105,12 +108,13 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
   // -------------------------------------------------------------
   useEffect(() => {
     let html5QrCode = null;
+    let isMounted = true;
 
     if (isOpen && step === "qr") {
-      const timer = setTimeout(() => {
+      const timer = setTimeout(async () => {
         try {
           const element = document.getElementById("qr-reader-target");
-          if (!element) return;
+          if (!element || !isMounted) return;
 
           html5QrCode = new Html5Qrcode("qr-reader-target");
           qrScannerRef.current = html5QrCode;
@@ -122,24 +126,26 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
           };
 
           // Try back camera first, fallback to user facing
-          html5QrCode
-            .start({ facingMode: "environment" }, config, onScanSuccess, () => {})
-            .then(() => setIsQrScannerActive(true))
-            .catch(() => {
-              html5QrCode
-                .start({ facingMode: "user" }, config, onScanSuccess, () => {})
-                .then(() => setIsQrScannerActive(true))
-                .catch((err) => {
-                  console.warn("QR Camera error:", err);
-                  setErrorMsg("Camera error while scanning QR code.");
-                });
-            });
+          try {
+            await html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess, () => {});
+            if (isMounted) setIsQrScannerActive(true);
+          } catch (backErr) {
+            console.warn("Back camera failed, trying front camera:", backErr);
+            try {
+              await html5QrCode.start({ facingMode: "user" }, config, onScanSuccess, () => {});
+              if (isMounted) setIsQrScannerActive(true);
+            } catch (err) {
+              console.warn("QR Camera error:", err);
+              if (isMounted) setErrorMsg("Camera error while scanning QR code. Please ensure camera permissions are allowed.");
+            }
+          }
         } catch (e) {
           console.warn("Html5Qrcode init error:", e);
         }
-      }, 250);
+      }, 400);
 
       return () => {
+        isMounted = false;
         clearTimeout(timer);
         stopQrScanner();
       };
@@ -211,12 +217,15 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
         throw new Error("Live selfie is required before attendance can be marked.");
       }
 
-      let finalPhotoUrl = null;
+      // Try Cloudinary upload, fallback directly to selfieDataUrl if unconfigured
+      let finalPhotoUrl = selfieDataUrl;
       try {
         const cdnRes = await uploadPhotoToCloudinary(selfieDataUrl, "student_live_photos", ["student", "temp_30days"]);
-        finalPhotoUrl = cdnRes.url;
+        if (cdnRes?.url) {
+          finalPhotoUrl = cdnRes.url;
+        }
       } catch (e) {
-        throw new Error(e.message || "Student photo upload failed. Please configure Cloudinary first.");
+        console.warn("Cloudinary upload skipped, using live selfie photo data:", e.message);
       }
 
       const record = await DataService.markAttendance({
