@@ -2,12 +2,17 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { DataService } from "../services/dataService";
 import { parseStudentExcel } from "../utils/excelParser";
-import { exportAttendancePDF, exportAttendanceExcel, exportSectionMasterAttendanceExcel } from "../utils/pdfExporter";
+import { 
+  exportAttendancePDF, 
+  exportAttendanceExcel, 
+  exportSectionMasterAttendanceExcel,
+  exportDailySectionAttendanceExcel 
+} from "../utils/pdfExporter";
 import { 
   Shield, UserCheck, UserX, Users, BookOpen, Upload, FileText, Download, 
   Trash2, Plus, RefreshCw, CheckCircle, AlertCircle, Layers, ClipboardCheck,
   HeartPulse, Sparkles, AlertTriangle, Camera, Image as ImageIcon,
-  Search, Filter, GraduationCap, Percent, CheckCircle2
+  Search, Filter, GraduationCap, Percent, CheckCircle2, Calendar, Clock
 } from "lucide-react";
 
 export const AdminDashboard = () => {
@@ -35,6 +40,13 @@ export const AdminDashboard = () => {
     semester: "1"
   });
   const [secExcelExporting, setSecExcelExporting] = useState(false);
+
+  // Daily Section Attendance Register State (Single Date)
+  const [dailyDate, setDailyDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [dailyBranch, setDailyBranch] = useState("CSE");
+  const [dailyYear, setDailyYear] = useState("1st");
+  const [dailySection, setDailySection] = useState("A");
+  const [dailyExporting, setDailyExporting] = useState(false);
 
   // Student 360° Attendance Explorer State
   const [explorerBranch, setExplorerBranch] = useState("CSE");
@@ -362,6 +374,46 @@ export const AdminDashboard = () => {
       alert("Failed to export Section Master Excel: " + e.message);
     } finally {
       setSecExcelExporting(false);
+    }
+  };
+
+  // Day sessions conducted on selected dailyDate for the chosen branch/year/section
+  const dailyMatchingSessions = sessions.filter(s => {
+    if (s.branch !== dailyBranch || s.year !== dailyYear || s.section !== dailySection) return false;
+    const sessDate = s.createdAt || s.startedAt;
+    if (!sessDate) return false;
+    const dStr = new Date(sessDate).toISOString().split("T")[0];
+    return dStr === dailyDate;
+  }).sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+
+  // Approved students matching daily section
+  const dailyMatchingStudents = users.filter(
+    u => u.role === "student" && u.status === "approved" &&
+         u.branch === dailyBranch && u.year === dailyYear && u.section === dailySection
+  );
+
+  // Daily Section Excel Export Handler
+  const handleExportDailySectionExcel = async () => {
+    setDailyExporting(true);
+    try {
+      if (dailyMatchingStudents.length === 0) {
+        alert(`No approved students found for ${dailyBranch} ${dailyYear} Sec-${dailySection}.`);
+        return;
+      }
+
+      await exportDailySectionAttendanceExcel({
+        date: dailyDate,
+        branch: dailyBranch,
+        year: dailyYear,
+        section: dailySection,
+        students: dailyMatchingStudents,
+        daySessions: dailyMatchingSessions,
+        attendanceRecords: attendance
+      });
+    } catch (e) {
+      alert("Failed to export Daily Attendance Sheet: " + e.message);
+    } finally {
+      setDailyExporting(false);
     }
   };
 
@@ -1657,7 +1709,225 @@ export const AdminDashboard = () => {
               </div>
             </div>
 
-            {/* 2. STUDENT 360° NUMERICAL ATTENDANCE EXPLORER */}
+            {/* 2. DAILY SECTION ATTENDANCE REGISTER (Date-wise Report) */}
+            <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 sm:p-8 shadow-sm border border-blue-100 space-y-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-100 pb-4 gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                      <Calendar className="w-5 h-5" />
+                    </div>
+                    <h2 className="text-xl font-bold text-slate-900">Daily Section Attendance Register</h2>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Pick a specific date to view all lectures conducted on that day and export the day's complete period register.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1 bg-indigo-50 text-indigo-800 text-xs font-mono font-bold rounded-xl border border-indigo-200">
+                    Lectures on Date: {dailyMatchingSessions.length}
+                  </span>
+                  
+                  {dailyMatchingSessions.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleExportDailySectionExcel}
+                      disabled={dailyExporting}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      {dailyExporting ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>Exporting...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Download Day Excel (.xlsx)</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Daily Filter Controls */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200 text-xs">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-indigo-600" /> Select Date
+                  </label>
+                  <input
+                    type="date"
+                    value={dailyDate}
+                    onChange={(e) => setDailyDate(e.target.value)}
+                    className="w-full p-2 bg-white border border-indigo-300 rounded-xl font-bold text-indigo-900 cursor-pointer focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Branch</label>
+                  <select
+                    value={dailyBranch}
+                    onChange={(e) => setDailyBranch(e.target.value)}
+                    className="w-full p-2 bg-white border border-slate-200 rounded-xl font-semibold text-slate-800 cursor-pointer"
+                  >
+                    {DataService.getDepartments().map(b => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Year</label>
+                  <select
+                    value={dailyYear}
+                    onChange={(e) => setDailyYear(e.target.value)}
+                    className="w-full p-2 bg-white border border-slate-200 rounded-xl font-semibold text-slate-800 cursor-pointer"
+                  >
+                    {DataService.getYears().map(y => <option key={y} value={y}>{y} Year</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Section</label>
+                  <select
+                    value={dailySection}
+                    onChange={(e) => setDailySection(e.target.value)}
+                    className="w-full p-2 bg-white border border-slate-200 rounded-xl font-semibold text-slate-800 cursor-pointer"
+                  >
+                    {DataService.getSections().map(s => <option key={s} value={s}>Sec {s}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Day's Lectures Summary Badges */}
+              {dailyMatchingSessions.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      Lectures on {new Date(dailyDate).toLocaleDateString("en-IN")}:
+                    </span>
+                    {dailyMatchingSessions.map((sess, idx) => (
+                      <span
+                        key={sess.id}
+                        className="px-2.5 py-1 bg-indigo-50 border border-indigo-200 text-indigo-800 rounded-lg text-xs font-semibold flex items-center gap-1.5"
+                      >
+                        <Clock className="w-3 h-3 text-indigo-500" />
+                        <span>P{idx + 1}: {sess.subjectName}</span>
+                        <span className="text-[10px] text-indigo-500 font-normal">
+                          ({sess.createdAt ? new Date(sess.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""})
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* Daily Period-wise Student Matrix Table */}
+                  <div className="overflow-x-auto border border-slate-200 rounded-2xl">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                          <th className="py-3 px-4">#</th>
+                          <th className="py-3 px-4">Roll No</th>
+                          <th className="py-3 px-4">Student Name</th>
+                          {dailyMatchingSessions.map((s, idx) => (
+                            <th key={s.id} className="py-3 px-4 text-center">
+                              P{idx + 1}: {s.subjectName}
+                            </th>
+                          ))}
+                          <th className="py-3 px-4 text-center">Attended</th>
+                          <th className="py-3 px-4 text-center">Day %</th>
+                          <th className="py-3 px-4 text-center">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-xs">
+                        {dailyMatchingStudents.length === 0 ? (
+                          <tr>
+                            <td colSpan={4 + dailyMatchingSessions.length} className="py-6 text-center text-slate-400">
+                              No approved students registered in {dailyBranch} {dailyYear} Sec-{dailySection}.
+                            </td>
+                          </tr>
+                        ) : (
+                          dailyMatchingStudents.map((stud, idx) => {
+                            let studentAttendedToday = 0;
+
+                            return (
+                              <tr key={stud.uid} className="hover:bg-blue-50/40 transition-colors">
+                                <td className="py-3 px-4 text-slate-400 font-mono">{idx + 1}</td>
+                                <td className="py-3 px-4 font-mono font-bold text-blue-700">{stud.rollNo}</td>
+                                <td className="py-3 px-4 font-bold text-slate-900">{stud.name}</td>
+                                {dailyMatchingSessions.map((sess) => {
+                                  const isPresent = attendance.some(a =>
+                                    a.sessionId === sess.id &&
+                                    (a.studentId === stud.uid || a.studentRoll === stud.rollNo || a.rollNo === stud.rollNo)
+                                  );
+
+                                  if (isPresent) studentAttendedToday += 1;
+
+                                  return (
+                                    <td key={sess.id} className="py-3 px-4 text-center">
+                                      {isPresent ? (
+                                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-bold text-[11px]">
+                                          ✅ Present
+                                        </span>
+                                      ) : (
+                                        <span className="px-2 py-0.5 bg-red-50 text-red-700 rounded font-bold text-[11px]">
+                                          ❌ Absent
+                                        </span>
+                                      )}
+                                    </td>
+                                  );
+                                })}
+
+                                <td className="py-3 px-4 text-center font-mono font-bold text-slate-900">
+                                  {studentAttendedToday} / {dailyMatchingSessions.length}
+                                </td>
+
+                                <td className="py-3 px-4 text-center">
+                                  <span className={`px-2 py-0.5 rounded font-mono font-bold text-xs ${
+                                    dailyMatchingSessions.length > 0 && Math.round((studentAttendedToday / dailyMatchingSessions.length) * 100) >= 75
+                                      ? "bg-emerald-100 text-emerald-800"
+                                      : "bg-red-100 text-red-800"
+                                  }`}>
+                                    {dailyMatchingSessions.length > 0
+                                      ? `${Math.round((studentAttendedToday / dailyMatchingSessions.length) * 100)}%`
+                                      : "100%"}
+                                  </span>
+                                </td>
+
+                                <td className="py-3 px-4 text-center">
+                                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                    studentAttendedToday === dailyMatchingSessions.length
+                                      ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                      : studentAttendedToday === 0
+                                      ? "bg-red-100 text-red-800 border border-red-200"
+                                      : "bg-amber-100 text-amber-800 border border-amber-200"
+                                  }`}>
+                                    {studentAttendedToday === dailyMatchingSessions.length
+                                      ? "✅ Full Day"
+                                      : studentAttendedToday === 0
+                                      ? "❌ All Absent"
+                                      : "⚠️ Partial"}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-8 border border-dashed border-slate-200 rounded-2xl text-center text-xs text-slate-400 bg-slate-50 space-y-1">
+                  <p className="font-semibold text-slate-600">No class sessions conducted on this date.</p>
+                  <p>
+                    There are no recorded class lectures for <span className="font-bold text-slate-700">{dailyBranch} {dailyYear} Sec-{dailySection}</span> on <span className="font-bold text-slate-700">{new Date(dailyDate).toLocaleDateString("en-IN")}</span>. Select a different date above.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* 3. STUDENT 360° NUMERICAL ATTENDANCE EXPLORER */}
             <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 sm:p-8 shadow-sm border border-blue-100 space-y-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-100 pb-4 gap-4">
                 <div className="space-y-1">

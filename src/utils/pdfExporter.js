@@ -780,3 +780,140 @@ export const exportSectionMasterAttendanceExcel = async ({
   const filename = `BEC_Section_Master_Attendance_${branch}_${year}_Sec${section}_Sem${semester}_${Date.now()}.xlsx`;
   await downloadExcelWorkbook(wb, filename);
 };
+
+
+// ─────────────────────────────────────────────
+// DAILY SECTION ATTENDANCE EXCEL (Specific Date Register with all periods)
+// ─────────────────────────────────────────────
+
+export const exportDailySectionAttendanceExcel = async ({
+  date,
+  branch,
+  year,
+  section,
+  students,
+  daySessions,
+  attendanceRecords
+}) => {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "BEC Attendance System";
+  wb.created = new Date();
+
+  const ws = wb.addWorksheet("Daily Attendance Register");
+
+  const totalCols = Math.max(6, 3 + (daySessions?.length || 0) + 3);
+  applyCollegeBanner(ws, totalCols);
+
+  const formattedDate = new Date(date).toLocaleDateString("en-IN", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric"
+  });
+
+  // Meta row at Row 3
+  const meta = ws.getRow(3);
+  meta.getCell(1).value = `Daily Class Register | Date: ${formattedDate} | Branch: ${branch} | Year: ${year} | Section: ${section} | Total Students: ${students.length} | Lectures Held Today: ${daySessions.length}`;
+  meta.getCell(1).font = { bold: true, size: 10, color: { argb: BEC_BLUE } };
+  meta.height = 22;
+
+  // Header titles
+  const headers = [
+    "S.No",
+    "Roll No",
+    "Student Name",
+    ...(daySessions || []).map((s, idx) => {
+      const timeStr = s.createdAt ? new Date(s.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+      return `P${idx + 1}: ${s.subjectName || "Lecture"} (${timeStr})`;
+    }),
+    "Classes Attended",
+    "Daily %",
+    "Daily Status"
+  ];
+
+  // Column widths
+  ws.getColumn(1).width = 6;
+  ws.getColumn(2).width = 16;
+  ws.getColumn(3).width = 24;
+  (daySessions || []).forEach((_, idx) => {
+    ws.getColumn(4 + idx).width = 24;
+  });
+  const afterSessCol = 4 + (daySessions?.length || 0);
+  ws.getColumn(afterSessCol).width = 16;
+  ws.getColumn(afterSessCol + 1).width = 14;
+  ws.getColumn(afterSessCol + 2).width = 18;
+
+  applyTableHeader(ws, 4, headers);
+
+  // Student rows
+  students.forEach((stud, i) => {
+    const rowNum = i + 5;
+    const row = ws.getRow(rowNum);
+    row.height = 24;
+
+    let studentAttendedToday = 0;
+
+    const sessionCells = (daySessions || []).map(sess => {
+      const isPresent = (attendanceRecords || []).some(a =>
+        a.sessionId === sess.id &&
+        (a.studentId === stud.uid || a.studentRoll === stud.rollNo || a.rollNo === stud.rollNo)
+      );
+
+      if (isPresent) {
+        studentAttendedToday += 1;
+        return "✅ PRESENT";
+      } else {
+        return "❌ ABSENT";
+      }
+    });
+
+    const totalLecturesToday = daySessions?.length || 0;
+    const dailyPct = totalLecturesToday > 0 ? Math.round((studentAttendedToday / totalLecturesToday) * 100) : 100;
+    const isFullPresent = totalLecturesToday > 0 ? studentAttendedToday === totalLecturesToday : true;
+
+    const rowValues = [
+      i + 1,
+      stud.rollNo || "N/A",
+      stud.name || "N/A",
+      ...sessionCells,
+      `${studentAttendedToday} / ${totalLecturesToday}`,
+      `${dailyPct}%`,
+      studentAttendedToday === 0
+        ? "❌ ALL ABSENT"
+        : isFullPresent
+        ? "✅ FULL DAY"
+        : "⚠️ PARTIAL"
+    ];
+
+    rowValues.forEach((val, cIdx) => {
+      const cell = row.getCell(cIdx + 1);
+      cell.value = val;
+      cell.alignment = { vertical: "middle", horizontal: cIdx === 2 ? "left" : "center" };
+
+      // Session cell styling
+      if (cIdx >= 3 && cIdx < 3 + (daySessions?.length || 0)) {
+        if (val === "✅ PRESENT") {
+          cell.font = { color: { argb: GREEN }, bold: true };
+        } else {
+          cell.font = { color: { argb: "FFCC0000" } };
+        }
+      }
+
+      if (cIdx === afterSessCol) { // Daily %
+        cell.font = { bold: true, size: 10, color: { argb: dailyPct >= 75 ? GREEN : "FFCC0000" } };
+      }
+      if (cIdx === afterSessCol + 1) { // Daily Status
+        cell.font = { bold: true, size: 9.5, color: { argb: isFullPresent ? GREEN : "FFCC0000" } };
+      }
+
+      if (i % 2 === 1) {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: STRIPE } };
+      }
+    });
+
+    row.commit();
+  });
+
+  const filename = `BEC_Daily_Attendance_${branch}_${year}_Sec${section}_${date}_${Date.now()}.xlsx`;
+  await downloadExcelWorkbook(wb, filename);
+};

@@ -7,7 +7,7 @@ import { exportAttendancePDF, exportAttendanceExcel, exportTeacherSessionExcel }
 import { 
   QrCode, School, Play, StopCircle, FileText, Download, Users, 
   Sparkles, CheckCircle2, Clock, Filter, BookOpen, Layers, Camera,
-  Trash2, Edit3, Save, X, UserCog
+  Trash2, Edit3, Save, X, UserCog, Calendar
 } from "lucide-react";
 
 export const TeacherDashboard = () => {
@@ -20,8 +20,9 @@ export const TeacherDashboard = () => {
   const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
   const [pendingSessionData, setPendingSessionData] = useState(null);
 
-  // Subject-wise filter state
+  // Subject-wise and Date-wise filter state
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState("all");
+  const [selectedDateFilter, setSelectedDateFilter] = useState("");
 
   // Edit Profile modal state
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
@@ -210,10 +211,19 @@ export const TeacherDashboard = () => {
     new Set(sessions.map(s => s.subjectName).filter(Boolean))
   );
 
-  // Filter sessions by selected subject
+  // Filter sessions by selected subject & date
   const filteredSessions = sessions.filter(sess => {
-    if (selectedSubjectFilter === "all") return true;
-    return sess.subjectName === selectedSubjectFilter || sess.subjectId === selectedSubjectFilter;
+    if (selectedSubjectFilter !== "all") {
+      const matchSub = sess.subjectName === selectedSubjectFilter || sess.subjectId === selectedSubjectFilter;
+      if (!matchSub) return false;
+    }
+    if (selectedDateFilter) {
+      const sessDate = sess.createdAt || sess.startedAt;
+      if (!sessDate) return false;
+      const dStr = new Date(sessDate).toISOString().split("T")[0];
+      if (dStr !== selectedDateFilter) return false;
+    }
+    return true;
   });
 
   return (
@@ -401,26 +411,51 @@ export const TeacherDashboard = () => {
               <p className="text-xs text-slate-500">Filter, view, and export past classroom attendance reports</p>
             </div>
             
-            {/* Subject-Wise Filter Dropdown */}
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-blue-600 shrink-0" />
-              <label htmlFor="subject-filter-select" className="text-xs font-bold text-slate-600 whitespace-nowrap">Filter Subject:</label>
-              <select
-                id="subject-filter-select"
-                value={selectedSubjectFilter}
-                onChange={(e) => setSelectedSubjectFilter(e.target.value)}
-                className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500 cursor-pointer min-w-[180px]"
-              >
-                <option value="all">All Subjects ({sessions.length})</option>
-                {distinctSubjects.map(subName => {
-                  const count = sessions.filter(s => s.subjectName === subName).length;
-                  return (
-                    <option key={subName} value={subName}>
-                      {subName} ({count})
-                    </option>
-                  );
-                })}
-              </select>
+            {/* Subject-Wise & Date-Wise Filters */}
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Date Filter */}
+              <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200">
+                <Calendar className="w-4 h-4 text-blue-600 shrink-0" />
+                <label className="text-xs font-bold text-slate-600 whitespace-nowrap">Date:</label>
+                <input
+                  type="date"
+                  value={selectedDateFilter}
+                  onChange={(e) => setSelectedDateFilter(e.target.value)}
+                  className="p-0.5 bg-transparent border-0 text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer"
+                />
+                {selectedDateFilter && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDateFilter("")}
+                    className="text-[10px] bg-slate-200 hover:bg-slate-300 px-1.5 py-0.5 rounded font-bold text-slate-600 cursor-pointer"
+                    title="Clear Date Filter"
+                  >
+                    ✕ Clear
+                  </button>
+                )}
+              </div>
+
+              {/* Subject Filter */}
+              <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200">
+                <Filter className="w-4 h-4 text-blue-600 shrink-0" />
+                <label htmlFor="subject-filter-select" className="text-xs font-bold text-slate-600 whitespace-nowrap">Subject:</label>
+                <select
+                  id="subject-filter-select"
+                  value={selectedSubjectFilter}
+                  onChange={(e) => setSelectedSubjectFilter(e.target.value)}
+                  className="p-0.5 bg-transparent border-0 text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer min-w-[140px]"
+                >
+                  <option value="all">All Subjects ({sessions.length})</option>
+                  {distinctSubjects.map(subName => {
+                    const count = sessions.filter(s => s.subjectName === subName).length;
+                    return (
+                      <option key={subName} value={subName}>
+                        {subName} ({count})
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
             </div>
           </div>
 
