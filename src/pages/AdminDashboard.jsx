@@ -6,7 +6,8 @@ import { exportAttendancePDF, exportAttendanceExcel } from "../utils/pdfExporter
 import { 
   Shield, UserCheck, UserX, Users, BookOpen, Upload, FileText, Download, 
   Trash2, Plus, RefreshCw, CheckCircle, AlertCircle, Layers, ClipboardCheck,
-  HeartPulse, Sparkles, AlertTriangle, Camera, Image as ImageIcon
+  HeartPulse, Sparkles, AlertTriangle, Camera, Image as ImageIcon,
+  Search, Filter
 } from "lucide-react";
 
 export const AdminDashboard = () => {
@@ -18,6 +19,13 @@ export const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState("pending");
   const [photoFilter, setPhotoFilter] = useState({ branch: "All", year: "All", section: "All", teacher: "All" });
   const [selectedPhoto, setSelectedPhoto] = useState(null);
+
+  // Manage Users Roster Filter State
+  const [userTabFilter, setUserTabFilter] = useState("all"); // "all" | "admin" | "teacher" | "student"
+  const [userBranchFilter, setUserBranchFilter] = useState("all");
+  const [userYearFilter, setUserYearFilter] = useState("all");
+  const [userSectionFilter, setUserSectionFilter] = useState("all");
+  const [userSearchQuery, setUserSearchQuery] = useState("");
 
   // New Subject Form
   const [newSubForm, setNewSubForm] = useState({ name: "", code: "", branch: "CSE", semester: "3" });
@@ -667,70 +675,248 @@ export const AdminDashboard = () => {
         )}
 
         {/* TAB 2: MANAGE USERS */}
-        {activeTab === "users" && (
-          <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 sm:p-8 shadow-sm border border-blue-100 space-y-6">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-              <div>
-                <h2 className="text-xl font-bold text-slate-900">Institutional User Roster</h2>
-                <p className="text-xs text-slate-500">All registered Students, Teachers, and Administrators</p>
-              </div>
-              <span className="text-xs font-mono font-bold bg-blue-50 text-blue-800 border border-blue-200 px-3 py-1 rounded-lg">
-                Total Users: {users.length}
-              </span>
-            </div>
+        {activeTab === "users" && (() => {
+          const adminCount = users.filter(u => u.role === "admin").length;
+          const teacherCount = users.filter(u => u.role === "teacher").length;
+          const studentCount = users.filter(u => u.role === "student").length;
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-blue-50/60 border-y border-blue-100 text-[11px] font-bold text-slate-600 uppercase">
-                    <th className="py-3 px-4">User</th>
-                    <th className="py-3 px-4">Role</th>
-                    <th className="py-3 px-4">Academic Details</th>
-                    <th className="py-3 px-4">Status</th>
-                    <th className="py-3 px-4 text-right">Manage</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-xs">
-                  {users.map((u) => (
-                    <tr key={u.uid} className="hover:bg-blue-50/40 transition-colors">
-                      <td className="py-3 px-4">
-                        <span className="font-bold text-slate-900 block">{u.name}</span>
-                        <span className="text-[11px] text-slate-500 font-mono">{u.email}</span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase ${
-                          u.role === "admin" ? "bg-blue-100 text-blue-800" :
-                          u.role === "teacher" ? "bg-sky-100 text-sky-800" : "bg-emerald-100 text-emerald-800"
-                        }`}>
-                          {u.role}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-slate-700">
-                        {u.role === "student" ? `${u.rollNo} • ${u.branch} ${u.year} Sec-${u.section}` : u.department || "N/A"}
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className={`px-2 py-0.5 rounded font-semibold text-[11px] ${
-                          u.status === "approved" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
-                        }`}>
-                          {u.status}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <button
-                          onClick={() => handleDeleteUser(u.uid)}
-                          className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                          title="Delete User"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
+          const filteredAdminUsers = users.filter((u) => {
+            if (userTabFilter !== "all" && u.role !== userTabFilter) return false;
+            if (userTabFilter === "student" || u.role === "student") {
+              if (userBranchFilter !== "all" && u.branch !== userBranchFilter) return false;
+              if (userYearFilter !== "all" && u.year !== userYearFilter) return false;
+              if (userSectionFilter !== "all" && u.section !== userSectionFilter) return false;
+            }
+            if (userSearchQuery.trim()) {
+              const q = userSearchQuery.toLowerCase().trim();
+              const matchName = u.name?.toLowerCase().includes(q);
+              const matchEmail = u.email?.toLowerCase().includes(q);
+              const matchRoll = u.rollNo?.toLowerCase().includes(q);
+              const matchDept = u.department?.toLowerCase().includes(q);
+              const matchBranch = u.branch?.toLowerCase().includes(q);
+              if (!matchName && !matchEmail && !matchRoll && !matchDept && !matchBranch) return false;
+            }
+            return true;
+          });
+
+          return (
+            <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 sm:p-8 shadow-sm border border-blue-100 space-y-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900">Institutional User Roster</h2>
+                  <p className="text-xs text-slate-500">All registered Students, Teachers, and Administrators</p>
+                </div>
+                <span className="text-xs font-mono font-bold bg-blue-50 text-blue-800 border border-blue-200 px-3 py-1 rounded-lg">
+                  Showing: {filteredAdminUsers.length} of {users.length} Users
+                </span>
+              </div>
+
+              {/* Role Filter Tabs + Search Bar */}
+              <div className="space-y-3 bg-slate-50/80 p-4 rounded-2xl border border-slate-200">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  
+                  {/* Role Tabs */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { setUserTabFilter("all"); }}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        userTabFilter === "all"
+                          ? "bg-blue-600 text-white shadow-sm"
+                          : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                      }`}
+                    >
+                      🌐 All ({users.length})
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => { setUserTabFilter("admin"); }}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        userTabFilter === "admin"
+                          ? "bg-purple-600 text-white shadow-sm"
+                          : "bg-white text-slate-600 hover:bg-purple-50 border border-slate-200"
+                      }`}
+                    >
+                      🛡️ Admins ({adminCount})
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => { setUserTabFilter("teacher"); }}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        userTabFilter === "teacher"
+                          ? "bg-sky-600 text-white shadow-sm"
+                          : "bg-white text-slate-600 hover:bg-sky-50 border border-slate-200"
+                      }`}
+                    >
+                      👨‍🏫 Teachers ({teacherCount})
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => { setUserTabFilter("student"); }}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        userTabFilter === "student"
+                          ? "bg-emerald-600 text-white shadow-sm"
+                          : "bg-white text-slate-600 hover:bg-emerald-50 border border-slate-200"
+                      }`}
+                    >
+                      🎓 Students ({studentCount})
+                    </button>
+                  </div>
+
+                  {/* Search Box */}
+                  <div className="relative flex-1 min-w-[200px] max-w-xs">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Search name, roll, email..."
+                      value={userSearchQuery}
+                      onChange={(e) => setUserSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-blue-500"
+                    />
+                    {userSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setUserSearchQuery("")}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Student Sub-Filters (Branch, Year, Section) */}
+                {(userTabFilter === "student" || userTabFilter === "all") && (
+                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200/80 text-xs">
+                    <span className="font-bold text-slate-500 flex items-center gap-1">
+                      <Filter className="w-3.5 h-3.5 text-blue-600" /> Student Filters:
+                    </span>
+
+                    {/* Branch Filter */}
+                    <select
+                      value={userBranchFilter}
+                      onChange={(e) => setUserBranchFilter(e.target.value)}
+                      className="p-1.5 bg-white border border-slate-200 rounded-lg font-semibold text-slate-700 cursor-pointer"
+                    >
+                      <option value="all">All Branches</option>
+                      {DataService.getDepartments().map(b => (
+                        <option key={b} value={b}>{b}</option>
+                      ))}
+                    </select>
+
+                    {/* Year Filter */}
+                    <select
+                      value={userYearFilter}
+                      onChange={(e) => setUserYearFilter(e.target.value)}
+                      className="p-1.5 bg-white border border-slate-200 rounded-lg font-semibold text-slate-700 cursor-pointer"
+                    >
+                      <option value="all">All Years</option>
+                      {DataService.getYears().map(y => (
+                        <option key={y} value={y}>{y} Year</option>
+                      ))}
+                    </select>
+
+                    {/* Section Filter */}
+                    <select
+                      value={userSectionFilter}
+                      onChange={(e) => setUserSectionFilter(e.target.value)}
+                      className="p-1.5 bg-white border border-slate-200 rounded-lg font-semibold text-slate-700 cursor-pointer"
+                    >
+                      <option value="all">All Sections</option>
+                      {DataService.getSections().map(s => (
+                        <option key={s} value={s}>Sec {s}</option>
+                      ))}
+                    </select>
+
+                    {(userBranchFilter !== "all" || userYearFilter !== "all" || userSectionFilter !== "all") && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUserBranchFilter("all");
+                          setUserYearFilter("all");
+                          setUserSectionFilter("all");
+                        }}
+                        className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded-md font-bold text-[11px] cursor-pointer"
+                      >
+                        Reset Filters
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-blue-50/60 border-y border-blue-100 text-[11px] font-bold text-slate-600 uppercase">
+                      <th className="py-3 px-4">User</th>
+                      <th className="py-3 px-4">Role</th>
+                      <th className="py-3 px-4">Academic Details</th>
+                      <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4 text-right">Manage</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs">
+                    {filteredAdminUsers.length === 0 ? (
+                      <tr>
+                        <td colSpan="5" className="py-8 text-center text-slate-400">
+                          No users match the selected filters.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredAdminUsers.map((u) => (
+                        <tr key={u.uid} className="hover:bg-blue-50/40 transition-colors">
+                          <td className="py-3 px-4">
+                            <span className="font-bold text-slate-900 block">{u.name}</span>
+                            <span className="text-[11px] text-slate-500 font-mono">{u.email}</span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase ${
+                              u.role === "admin" ? "bg-purple-100 text-purple-800" :
+                              u.role === "teacher" ? "bg-sky-100 text-sky-800" : "bg-emerald-100 text-emerald-800"
+                            }`}>
+                              {u.role}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-slate-700">
+                            {u.role === "student" ? (
+                              <div>
+                                <span className="font-mono text-blue-700 font-bold">{u.rollNo}</span> • <span className="font-semibold text-slate-900">{u.branch}</span> ({u.year} Yr Sec-{u.section} Sem {u.semester || "1"})
+                              </div>
+                            ) : u.role === "teacher" ? (
+                              <div>{u.department} Dept • {u.subjectName || "Core Faculty"}</div>
+                            ) : (
+                              <div>Administration / Dean</div>
+                            )}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className={`px-2 py-0.5 rounded font-semibold text-[11px] ${
+                              u.status === "approved" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                            }`}>
+                              {u.status}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <button
+                              onClick={() => handleDeleteUser(u.uid)}
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                              title="Delete User"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* TAB 3: SUBJECTS & BRANCHES SETUP */}
         {activeTab === "academic" && (

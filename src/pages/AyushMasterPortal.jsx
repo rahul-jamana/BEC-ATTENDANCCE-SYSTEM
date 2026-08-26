@@ -8,7 +8,8 @@ import {
   Shield, UserPlus, Users, School, GraduationCap, ArrowRight, 
   Trash2, CheckCircle2, AlertCircle, RefreshCw, KeyRound, 
   Sparkles, Layers, Lock, Mail, User, BookOpen, Check, X, 
-  ShieldAlert, Eye, EyeOff, Key, LogOut, ShieldCheck, LockKeyhole
+  ShieldAlert, Eye, EyeOff, Key, LogOut, ShieldCheck, LockKeyhole,
+  Search, Filter
 } from "lucide-react";
 
 export const AyushMasterPortal = () => {
@@ -30,6 +31,13 @@ export const AyushMasterPortal = () => {
   const [activeTab, setActiveTab] = useState("create"); // "create" | "users" | "quick-switch"
   const [createRole, setCreateRole] = useState("student"); // "student" | "teacher" | "admin"
   const [showPassword, setShowPassword] = useState(false);
+
+  // User Filter State for Master Roster & Quick Switch
+  const [userRoleFilter, setUserRoleFilter] = useState("all"); // "all" | "admin" | "teacher" | "student"
+  const [userBranchFilter, setUserBranchFilter] = useState("all");
+  const [userYearFilter, setUserYearFilter] = useState("all");
+  const [userSectionFilter, setUserSectionFilter] = useState("all");
+  const [userSearchQuery, setUserSearchQuery] = useState("");
 
   // Feedback Messages
   const [successMsg, setSuccessMsg] = useState("");
@@ -746,8 +754,145 @@ export const AyushMasterPortal = () => {
                 <p className="text-xs text-slate-500">Manage, delete, approve, view passwords, or instantly switch into any account</p>
               </div>
               <span className="px-3 py-1 bg-blue-50 text-blue-800 text-xs font-mono font-bold rounded-xl border border-blue-200">
-                {users.length} Total Registered
+                Showing: {filteredUsers.length} of {users.length} Users
               </span>
+            </div>
+
+            {/* Role Filter Tabs + Search Bar */}
+            <div className="space-y-3 bg-slate-50/80 p-4 rounded-2xl border border-slate-200">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                
+                {/* Role Tabs */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setUserRoleFilter("all"); }}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      userRoleFilter === "all"
+                        ? "bg-blue-600 text-white shadow-sm"
+                        : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                    }`}
+                  >
+                    🌐 All ({users.length})
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setUserRoleFilter("admin"); }}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      userRoleFilter === "admin"
+                        ? "bg-purple-600 text-white shadow-sm"
+                        : "bg-white text-slate-600 hover:bg-purple-50 border border-slate-200"
+                    }`}
+                  >
+                    🛡️ Admins ({users.filter(u => u.role === "admin").length})
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setUserRoleFilter("teacher"); }}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      userRoleFilter === "teacher"
+                        ? "bg-sky-600 text-white shadow-sm"
+                        : "bg-white text-slate-600 hover:bg-sky-50 border border-slate-200"
+                    }`}
+                  >
+                    👨‍🏫 Teachers ({users.filter(u => u.role === "teacher").length})
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setUserRoleFilter("student"); }}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      userRoleFilter === "student"
+                        ? "bg-emerald-600 text-white shadow-sm"
+                        : "bg-white text-slate-600 hover:bg-emerald-50 border border-slate-200"
+                    }`}
+                  >
+                    🎓 Students ({users.filter(u => u.role === "student").length})
+                  </button>
+                </div>
+
+                {/* Search Box */}
+                <div className="relative flex-1 min-w-[200px] max-w-xs">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Search name, roll, email..."
+                    value={userSearchQuery}
+                    onChange={(e) => setUserSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-blue-500"
+                  />
+                  {userSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setUserSearchQuery("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Student Sub-Filters (Branch, Year, Section) */}
+              {(userRoleFilter === "student" || userRoleFilter === "all") && (
+                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200/80 text-xs">
+                  <span className="font-bold text-slate-500 flex items-center gap-1">
+                    <Filter className="w-3.5 h-3.5 text-blue-600" /> Student Filters:
+                  </span>
+
+                  {/* Branch Filter */}
+                  <select
+                    value={userBranchFilter}
+                    onChange={(e) => setUserBranchFilter(e.target.value)}
+                    className="p-1.5 bg-white border border-slate-200 rounded-lg font-semibold text-slate-700 cursor-pointer"
+                  >
+                    <option value="all">All Branches</option>
+                    {DataService.getDepartments().map(b => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
+                  </select>
+
+                  {/* Year Filter */}
+                  <select
+                    value={userYearFilter}
+                    onChange={(e) => setUserYearFilter(e.target.value)}
+                    className="p-1.5 bg-white border border-slate-200 rounded-lg font-semibold text-slate-700 cursor-pointer"
+                  >
+                    <option value="all">All Years</option>
+                    {DataService.getYears().map(y => (
+                      <option key={y} value={y}>{y} Year</option>
+                    ))}
+                  </select>
+
+                  {/* Section Filter */}
+                  <select
+                    value={userSectionFilter}
+                    onChange={(e) => setUserSectionFilter(e.target.value)}
+                    className="p-1.5 bg-white border border-slate-200 rounded-lg font-semibold text-slate-700 cursor-pointer"
+                  >
+                    <option value="all">All Sections</option>
+                    {DataService.getSections().map(s => (
+                      <option key={s} value={s}>Sec {s}</option>
+                    ))}
+                  </select>
+
+                  {(userBranchFilter !== "all" || userYearFilter !== "all" || userSectionFilter !== "all") && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUserBranchFilter("all");
+                        setUserYearFilter("all");
+                        setUserSectionFilter("all");
+                      }}
+                      className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded-md font-bold text-[11px] cursor-pointer"
+                    >
+                      Reset Filters
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="overflow-x-auto">
@@ -763,77 +908,85 @@ export const AyushMasterPortal = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs">
-                  {users.map((u) => (
-                    <tr key={u.uid} className="hover:bg-blue-50/40 transition-colors">
-                      <td className="py-3.5 px-4">
-                        <div className="font-bold text-slate-900">{u.name}</div>
-                        <div className="text-slate-500 font-mono text-[11px]">{u.email}</div>
-                      </td>
-
-                      <td className="py-3.5 px-4">
-                        <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${
-                          u.role === "admin"
-                            ? "bg-purple-100 text-purple-800 border border-purple-200"
-                            : u.role === "teacher"
-                            ? "bg-sky-100 text-sky-800 border border-sky-200"
-                            : "bg-emerald-100 text-emerald-800 border border-emerald-200"
-                        }`}>
-                          {u.role}
-                        </span>
-                      </td>
-
-                      {/* Visible Password Column for Ayush */}
-                      <td className="py-3.5 px-4">
-                        <span className="font-mono text-xs font-bold text-blue-900 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">
-                          {u.password || "demo123"}
-                        </span>
-                      </td>
-
-                      <td className="py-3.5 px-4 text-slate-700">
-                        {u.role === "student" ? (
-                          <div>
-                            <span className="font-mono text-blue-700 font-bold">{u.rollNo}</span> • {u.branch} ({u.year} Yr Sec-{u.section} Sem {u.semester || "1"})
-                          </div>
-                        ) : u.role === "teacher" ? (
-                          <div>{u.department} Dept • {u.subjectName || "Core Faculty"}</div>
-                        ) : (
-                          <div>Administrator / Dean</div>
-                        )}
-                      </td>
-
-                      <td className="py-3.5 px-4">
-                        <button
-                          onClick={() => handleToggleStatus(u)}
-                          className={`px-2.5 py-1 rounded-full text-[10px] font-bold cursor-pointer transition-colors ${
-                            u.status === "approved"
-                              ? "bg-emerald-100 text-emerald-800 border border-emerald-200 hover:bg-emerald-200"
-                              : "bg-amber-100 text-amber-800 border border-amber-200 hover:bg-amber-200"
-                          }`}
-                          title="Click to toggle status"
-                        >
-                          {u.status === "approved" ? "✅ Approved" : "⏳ Pending"}
-                        </button>
-                      </td>
-
-                      <td className="py-3.5 px-4 text-right space-x-2">
-                        <button
-                          onClick={() => handleInstantSwitch(u)}
-                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-[11px] transition-colors cursor-pointer inline-flex items-center gap-1 shadow-xs"
-                        >
-                          <KeyRound className="w-3 h-3" />
-                          <span>Login As</span>
-                        </button>
-
-                        <button
-                          onClick={() => handleDeleteUser(u.uid, u.name)}
-                          className="p-1.5 bg-red-100 hover:bg-red-200 text-red-700 border border-red-200 rounded-xl transition-colors cursor-pointer inline-flex items-center"
-                          title="Delete User"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                  {filteredUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="py-8 text-center text-slate-400">
+                        No user accounts match the selected filters.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    filteredUsers.map((u) => (
+                      <tr key={u.uid} className="hover:bg-blue-50/40 transition-colors">
+                        <td className="py-3.5 px-4">
+                          <div className="font-bold text-slate-900">{u.name}</div>
+                          <div className="text-slate-500 font-mono text-[11px]">{u.email}</div>
+                        </td>
+
+                        <td className="py-3.5 px-4">
+                          <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${
+                            u.role === "admin"
+                              ? "bg-purple-100 text-purple-800 border border-purple-200"
+                              : u.role === "teacher"
+                              ? "bg-sky-100 text-sky-800 border border-sky-200"
+                              : "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                          }`}>
+                            {u.role}
+                          </span>
+                        </td>
+
+                        {/* Visible Password Column for Ayush */}
+                        <td className="py-3.5 px-4">
+                          <span className="font-mono text-xs font-bold text-blue-900 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">
+                            {u.password || "demo123"}
+                          </span>
+                        </td>
+
+                        <td className="py-3.5 px-4 text-slate-700">
+                          {u.role === "student" ? (
+                            <div>
+                              <span className="font-mono text-blue-700 font-bold">{u.rollNo}</span> • <span className="font-semibold text-slate-900">{u.branch}</span> ({u.year} Yr Sec-{u.section} Sem {u.semester || "1"})
+                            </div>
+                          ) : u.role === "teacher" ? (
+                            <div>{u.department} Dept • {u.subjectName || "Core Faculty"}</div>
+                          ) : (
+                            <div>Administrator / Dean</div>
+                          )}
+                        </td>
+
+                        <td className="py-3.5 px-4">
+                          <button
+                            onClick={() => handleToggleStatus(u)}
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold cursor-pointer transition-colors ${
+                              u.status === "approved"
+                                ? "bg-emerald-100 text-emerald-800 border border-emerald-200 hover:bg-emerald-200"
+                                : "bg-amber-100 text-amber-800 border border-amber-200 hover:bg-amber-200"
+                            }`}
+                            title="Click to toggle status"
+                          >
+                            {u.status === "approved" ? "✅ Approved" : "⏳ Pending"}
+                          </button>
+                        </td>
+
+                        <td className="py-3.5 px-4 text-right space-x-2">
+                          <button
+                            onClick={() => handleInstantSwitch(u)}
+                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-[11px] transition-colors cursor-pointer inline-flex items-center gap-1 shadow-xs"
+                          >
+                            <KeyRound className="w-3 h-3" />
+                            <span>Login As</span>
+                          </button>
+
+                          <button
+                            onClick={() => handleDeleteUser(u.uid, u.name)}
+                            className="p-1.5 bg-red-100 hover:bg-red-200 text-red-700 border border-red-200 rounded-xl transition-colors cursor-pointer inline-flex items-center"
+                            title="Delete User"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -845,55 +998,124 @@ export const AyushMasterPortal = () => {
             ======================================================== */}
         {activeTab === "quick-switch" && (
           <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 sm:p-8 border border-blue-100 shadow-sm space-y-6">
-            <div>
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900">Instant 1-Click Master Role Switcher</h2>
-              <p className="text-xs text-slate-500">Click any card below to immediately log in and explore their dashboard</p>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-black text-slate-900">Instant 1-Click Master Role Switcher</h2>
+                <p className="text-xs text-slate-500">Click any card below to immediately log in and explore their dashboard</p>
+              </div>
+              <span className="px-3 py-1 bg-blue-50 text-blue-800 text-xs font-mono font-bold rounded-xl border border-blue-200">
+                Showing: {filteredUsers.length} of {users.length} Users
+              </span>
+            </div>
+
+            {/* Filter controls for Quick Switcher too */}
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50/80 p-4 rounded-2xl border border-slate-200">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setUserRoleFilter("all")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    userRoleFilter === "all" ? "bg-blue-600 text-white shadow-sm" : "bg-white text-slate-600 border border-slate-200"
+                  }`}
+                >
+                  🌐 All ({users.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUserRoleFilter("admin")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    userRoleFilter === "admin" ? "bg-purple-600 text-white shadow-sm" : "bg-white text-slate-600 border border-slate-200"
+                  }`}
+                >
+                  🛡️ Admins ({users.filter(u => u.role === "admin").length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUserRoleFilter("teacher")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    userRoleFilter === "teacher" ? "bg-sky-600 text-white shadow-sm" : "bg-white text-slate-600 border border-slate-200"
+                  }`}
+                >
+                  👨‍🏫 Teachers ({users.filter(u => u.role === "teacher").length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUserRoleFilter("student")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    userRoleFilter === "student" ? "bg-emerald-600 text-white shadow-sm" : "bg-white text-slate-600 border border-slate-200"
+                  }`}
+                >
+                  🎓 Students ({users.filter(u => u.role === "student").length})
+                </button>
+              </div>
+
+              <div className="relative flex-1 min-w-[200px] max-w-xs">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search accounts..."
+                  value={userSearchQuery}
+                  onChange={(e) => setUserSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {users.map((u) => (
-                <div
-                  key={u.uid}
-                  onClick={() => handleInstantSwitch(u)}
-                  className="p-5 rounded-2xl bg-slate-50/80 hover:bg-blue-50/80 border border-slate-200 hover:border-blue-300 transition-all cursor-pointer group flex flex-col justify-between space-y-3"
-                >
-                  <div className="flex items-start justify-between">
-                    <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${
-                      u.role === "admin"
-                        ? "bg-purple-100 text-purple-800 border border-purple-200"
-                        : u.role === "teacher"
-                        ? "bg-sky-100 text-sky-800 border border-sky-200"
-                        : "bg-emerald-100 text-emerald-800 border border-emerald-200"
-                    }`}>
-                      {u.role}
-                    </span>
-
-                    <span className={`text-[10px] font-bold ${u.status === "approved" ? "text-emerald-700" : "text-amber-700"}`}>
-                      {u.status === "approved" ? "✅ Active" : "⏳ Pending"}
-                    </span>
-                  </div>
-
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-700 transition-colors">
-                      {u.name}
-                    </h3>
-                    <p className="text-slate-500 font-mono text-xs">{u.email}</p>
-                    <p className="text-xs text-slate-600 mt-1 font-mono font-medium">
-                      Password: <span className="font-bold text-blue-700">{u.password || "demo123"}</span>
-                    </p>
-                    {u.role === "student" && (
-                      <p className="text-xs text-slate-500 mt-1">
-                        {u.branch} • {u.year} Yr (Sec {u.section}) • Roll: <span className="font-mono text-slate-800 font-bold">{u.rollNo}</span>
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="pt-3 border-t border-slate-200 flex items-center justify-between text-xs text-blue-700 font-bold">
-                    <span>Jump to Dashboard</span>
-                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  </div>
+              {filteredUsers.length === 0 ? (
+                <div className="col-span-full py-8 text-center text-slate-400">
+                  No accounts found for the selected filter.
                 </div>
-              ))}
+              ) : (
+                filteredUsers.map((u) => (
+                  <div
+                    key={u.uid}
+                    onClick={() => handleInstantSwitch(u)}
+                    className="p-5 rounded-2xl bg-slate-50/80 hover:bg-blue-50/80 border border-slate-200 hover:border-blue-300 transition-all cursor-pointer group flex flex-col justify-between space-y-3 shadow-xs"
+                  >
+                    <div className="flex items-start justify-between">
+                      <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${
+                        u.role === "admin"
+                          ? "bg-purple-100 text-purple-800 border border-purple-200"
+                          : u.role === "teacher"
+                          ? "bg-sky-100 text-sky-800 border border-sky-200"
+                          : "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                      }`}>
+                        {u.role}
+                      </span>
+
+                      <span className={`text-[10px] font-bold ${u.status === "approved" ? "text-emerald-700" : "text-amber-700"}`}>
+                        {u.status === "approved" ? "✅ Active" : "⏳ Pending"}
+                      </span>
+                    </div>
+
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-700 transition-colors">
+                        {u.name}
+                      </h3>
+                      <p className="text-slate-500 font-mono text-xs">{u.email}</p>
+                      <p className="text-xs text-slate-600 mt-1 font-mono font-medium">
+                        Password: <span className="font-bold text-blue-700">{u.password || "demo123"}</span>
+                      </p>
+                      {u.role === "student" && (
+                        <p className="text-xs text-slate-500 mt-1">
+                          <span className="font-semibold text-slate-800">{u.branch}</span> • {u.year} Yr (Sec {u.section}) • Roll: <span className="font-mono text-slate-800 font-bold">{u.rollNo}</span>
+                        </p>
+                      )}
+                      {u.role === "teacher" && (
+                        <p className="text-xs text-slate-500 mt-1">
+                          {u.department} Dept • {u.subjectName || "Faculty"}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-200 flex items-center justify-between text-xs text-blue-700 font-bold">
+                      <span>Jump to Dashboard</span>
+                      <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}
