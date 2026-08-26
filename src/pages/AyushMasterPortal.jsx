@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { DataService } from "../services/dataService";
+import { auth, isLiveFirebaseConfigured } from "../firebase/config";
+import { createUserWithEmailAndPassword } from "firebase/auth";
 import { useNavigate, Link } from "react-router-dom";
 import { 
   Shield, UserPlus, Users, School, GraduationCap, ArrowRight, 
@@ -118,7 +120,24 @@ export const AyushMasterPortal = () => {
         throw new Error(`An account with email "${form.email}" already exists!`);
       }
 
-      const uid = `uid_${Date.now()}`;
+      // Try to register user in Firebase Auth so they can log in via email/password
+      let uid = `uid_${Date.now()}`;
+      if (isLiveFirebaseConfigured && auth) {
+        try {
+          const firebaseRes = await createUserWithEmailAndPassword(
+            auth,
+            form.email.trim().toLowerCase(),
+            form.password.trim()
+          );
+          uid = firebaseRes.user.uid;
+        } catch (firebaseErr) {
+          // If user already exists in Firebase Auth, that's fine — use generated uid
+          if (firebaseErr.code !== "auth/email-already-in-use") {
+            console.warn("Firebase Auth registration failed (will use Firestore-only login):", firebaseErr.message);
+          }
+        }
+      }
+
       let newProfile = {
         uid,
         name: form.name.trim(),

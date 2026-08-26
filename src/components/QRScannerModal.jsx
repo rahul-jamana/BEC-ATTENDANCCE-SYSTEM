@@ -188,9 +188,22 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
 
     try {
       const sessions = await DataService.getSessions();
-      const targetSession = sessions.find((s) => s.id === parsedData.sessionId);
+      const persistedSession = sessions.find((s) => s.id === parsedData.sessionId);
 
-      if (!targetSession) {
+      const targetSession = persistedSession || {
+        id: parsedData.sessionId,
+        branch: parsedData.branch,
+        year: parsedData.year,
+        section: parsedData.section,
+        semester: parsedData.semester,
+        subjectId: parsedData.subjectId,
+        subjectName: parsedData.subjectName || "Class Lecture",
+        teacherName: parsedData.teacherName || "Faculty",
+        token: parsedData.token,
+        isActive: true
+      };
+
+      if (!targetSession || !targetSession.id) {
         throw new Error("Invalid Session QR code!");
       }
 

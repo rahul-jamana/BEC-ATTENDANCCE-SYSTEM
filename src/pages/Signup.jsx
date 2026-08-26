@@ -37,7 +37,7 @@ export const Signup = () => {
 
     try {
       await signupStudent(formData);
-      setIsSubmitted(true);
+      navigate("/student");
     } catch (err) {
       setError(err.message || "Failed to register account.");
     } finally {

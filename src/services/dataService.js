@@ -700,7 +700,29 @@ export const DataService = {
         const snap = await getDocs(collection(db, "users"));
         return snap.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
       } catch (e) {
-        console.warn("Firestore error, reading local:", e);
+        console.warn("Firestore SDK error, trying REST fallback:", e);
+        // REST API fallback — works even when user is unauthenticated
+        // (solves chicken-and-egg: need users to auth, need auth to get users)
+        try {
+          const projectId = "bec-at-system";
+          const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users`;
+          const res = await fetch(url);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.documents) {
+              return data.documents.map(d => {
+                const fields = d.fields || {};
+                const result = { uid: d.name.split("/").pop() };
+                for (const [key, val] of Object.entries(fields)) {
+                  result[key] = val.stringValue ?? val.booleanValue ?? val.integerValue ?? val.doubleValue ?? null;
+                }
+                return result;
+              });
+            }
+          }
+        } catch (restErr) {
+          console.warn("Firestore REST fallback also failed:", restErr);
+        }
       }
     }
     return JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || "[]");
@@ -955,39 +977,79 @@ export const DataService = {
     const allAttendance = await this.getAttendance();
     const allSubjects = await this.getSubjects();
 
-    const classAssignments = JSON.parse(localStorage.getItem("bec_class_subject_assignments_db") || "[]");
-    const assignedSubjects = classAssignments.filter(
-      a =>
-        a.branch === student.branch &&
-        a.year === student.year &&
-        a.section === student.section &&
-        a.semester === student.semester
+    // 1. Get standard BPUT Curriculum subjects for student's branch & semester
+    const bputList = this.getBputSubjectsForBranch(student?.branch, student?.semester) || [];
+    
+    // 2. Map of distinct subjects to track
+    const subjectsMap = new Map();
+
+    // Add BPUT catalog subjects
+    bputList.forEach(b => {
+      const key = b.code || b.name;
+      subjectsMap.set(key, {
+        id: b.code || b.name,
+        name: b.name,
+        code: b.code
+      });
+    });
+
+    // 3. Add any subjects from class sessions held for this student's branch + year + section
+    const classSessions = allSessions.filter(
+      sess =>
+        sess.branch === student?.branch &&
+        sess.year === student?.year &&
+        sess.section === student?.section
     );
 
-    const assignedSubjectIds = [...new Set(assignedSubjects.map(a => a.subjectId))];
+    classSessions.forEach(sess => {
+      const key = sess.subjectId || sess.subjectName;
+      if (!subjectsMap.has(key)) {
+        subjectsMap.set(key, {
+          id: sess.subjectId || key,
+          name: sess.subjectName || key,
+          code: sess.subjectId || ""
+        });
+      }
+    });
 
-    if (assignedSubjectIds.length === 0) {
-      return [];
-    }
+    // 4. Add any custom subjects registered in database for this branch & semester
+    const customBranchSubs = allSubjects.filter(
+      s => s.branch === student?.branch && (!s.semester || s.semester === student?.semester)
+    );
+    customBranchSubs.forEach(s => {
+      const key = s.code || s.id || s.name;
+      if (!subjectsMap.has(key)) {
+        subjectsMap.set(key, {
+          id: s.id,
+          name: s.name,
+          code: s.code || ""
+        });
+      }
+    });
 
-    const relevantSubjects = allSubjects.filter(sub => assignedSubjectIds.includes(sub.id));
+    // 5. Calculate percentage and statistics per subject
+    const subjectList = Array.from(subjectsMap.values());
 
-    const stats = relevantSubjects.map(sub => {
+    const stats = subjectList.map(sub => {
+      // Total classes held for this subject for this student's branch + year + section
       const totalClasses = allSessions.filter(
         sess =>
-          sess.branch === student.branch &&
-          sess.year === student.year &&
-          sess.section === student.section &&
-          sess.subjectId === sub.id
+          sess.branch === student?.branch &&
+          sess.year === student?.year &&
+          sess.section === student?.section &&
+          (sess.subjectId === sub.id || sess.subjectName === sub.name || sess.subjectId === sub.code)
       ).length;
 
+      // Attended classes by this student for this subject
       const attendedClasses = allAttendance.filter(
-        att => att.studentId === student.uid && att.subjectId === sub.id
+        att =>
+          (att.studentId === student?.uid || (att.rollNo && att.rollNo === student?.rollNo)) &&
+          (att.subjectId === sub.id || att.subjectName === sub.name || att.subjectId === sub.code)
       ).length;
 
       const percentage = totalClasses > 0
         ? Math.round((attendedClasses / totalClasses) * 100)
-        : 0;
+        : 100;
 
       return {
         subjectId: sub.id,
@@ -996,7 +1058,7 @@ export const DataService = {
         totalClasses,
         attendedClasses,
         percentage,
-        isWarning: percentage < 75
+        isWarning: totalClasses > 0 && percentage < 75
       };
     });
 

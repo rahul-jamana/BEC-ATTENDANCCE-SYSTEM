@@ -5,17 +5,29 @@
 
 const STORAGE_KEY = "bec_cloudinary_config";
 
+const normalizeUploadPreset = (value) => {
+  if (!value) return "attendance_system_BEC";
+  return String(value).trim().replace(/\s+/g, "_");
+};
+
 // Read from Environment Variables or Local Storage Override
 export const getCloudinaryConfig = () => {
   const localSaved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+  const normalizedPreset = normalizeUploadPreset(
+    localSaved.uploadPreset || import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || "attendance_system_BEC"
+  );
+
   return {
     cloudName: localSaved.cloudName || import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || "dyh2ne8ho",
-    uploadPreset: localSaved.uploadPreset || import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || "attendance system BEC"
+    uploadPreset: normalizedPreset
   };
 };
 
 export const saveCloudinaryConfig = (config) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    ...config,
+    uploadPreset: normalizeUploadPreset(config?.uploadPreset || "attendance_system_BEC")
+  }));
 };
 
 export const isCloudinaryConfigured = () => {
@@ -51,7 +63,20 @@ export const uploadPhotoToCloudinary = async (base64Image, folder = "bec_attenda
       body: formData
     });
 
-    const data = await response.json();
+    let data = {};
+    try {
+      data = await response.json();
+    } catch (e) {
+      data = {};
+    }
+
+    if (!response.ok) {
+      const cloudError = data?.error?.message || "Cloudinary upload failed.";
+      if (cloudError.toLowerCase().includes("upload preset") || cloudError.toLowerCase().includes("preset")) {
+        throw new Error("Cloudinary upload preset not found. Create an unsigned upload preset named attendance_system_BEC in Cloudinary and keep the same name in .env.");
+      }
+      throw new Error(cloudError);
+    }
 
     if (data.secure_url) {
       return {
@@ -61,7 +86,7 @@ export const uploadPhotoToCloudinary = async (base64Image, folder = "bec_attenda
       };
     }
 
-    throw new Error(data?.error?.message || "Cloudinary image upload failed.");
+    throw new Error("Cloudinary image upload failed.");
   } catch (error) {
     console.error("Cloudinary upload failed:", error);
     throw new Error(error?.message || "Cloudinary image upload failed.");

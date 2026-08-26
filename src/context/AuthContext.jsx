@@ -54,43 +54,79 @@ export const AuthProvider = ({ children }) => {
     const newProfile = {
       uid,
       name: studentData.name,
-      rollNo: studentData.rollNo,
-      email: studentData.email,
+      rollNo: (studentData.rollNo || "").trim().toUpperCase(),
+      email: (studentData.email || "").trim(),
       password: studentData.password,
       branch: studentData.branch,
       year: studentData.year,
       section: studentData.section,
       semester: studentData.semester,
       role: "student",
-      status: "pending", // Default status pending until Admin approves
+      status: "approved", // Auto-approved for instant login & testing
       createdAt: new Date().toISOString()
     };
 
     await DataService.createUser(newProfile);
+    
+    // Auto-login newly registered student
+    setCurrentUser(newProfile);
+    setUserProfile(newProfile);
+    localStorage.setItem("bec_current_user", JSON.stringify(newProfile));
+    
     return newProfile;
   };
 
-  // Standard Email Login
-  const login = async (email, password) => {
+  // Universal Login (Accepts Email or Roll Number)
+  const login = async (identifier, password) => {
+    const trimmedId = (identifier || "").trim().toLowerCase();
+    const isEmail = trimmedId.includes("@");
+
+    // STEP 1: If identifier looks like an email AND Firebase is configured,
+    // try Firebase Auth FIRST. This solves the chicken-and-egg problem:
+    // Firestore rules require auth to read, but we need to read to auth.
+    if (isEmail && isLiveFirebaseConfigured && auth) {
+      try {
+        const firebaseResult = await signInWithEmailAndPassword(auth, trimmedId, password);
+        // Firebase Auth succeeded — now fetch the profile (auth token is now valid)
+        const profile = await DataService.getUserById(firebaseResult.user.uid);
+        if (profile) {
+          setCurrentUser(firebaseResult.user);
+          setUserProfile(profile);
+          localStorage.setItem("bec_current_user", JSON.stringify(profile));
+          return profile;
+        }
+      } catch (firebaseErr) {
+        // Firebase Auth failed — could be wrong password or user not in Firebase Auth.
+        const code = firebaseErr.code || "";
+        if (
+          code === "auth/wrong-password" ||
+          code === "auth/invalid-credential" ||
+          code === "auth/invalid-password"
+        ) {
+          throw new Error("Incorrect password. Please check your password and try again.");
+        }
+        // For user-not-found or other errors, fall through to Firestore/local lookup
+        // (users created via Master Portal exist in Firestore but not in Firebase Auth)
+        console.warn("Firebase Auth attempt failed, falling back to local lookup:", firebaseErr.message);
+      }
+    }
+
+    // STEP 2: Fallback — look up user by email or roll number from Firestore/localStorage
     let userFromDb = null;
     const allUsers = await DataService.getUsers();
-    userFromDb = allUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
+
+    userFromDb = allUsers.find(u =>
+      (u.email && u.email.toLowerCase() === trimmedId) ||
+      (u.rollNo && u.rollNo.toLowerCase() === trimmedId)
+    );
 
     if (!userFromDb) {
-      throw new Error("Invalid credentials: No account found with this email.");
+      throw new Error("Invalid credentials: No account found with this Email or Roll Number.");
     }
 
-    // Password verification logic
+    // Password check for locally-stored users (password field exists in profile)
     if (userFromDb.password && userFromDb.password !== password) {
       throw new Error("Incorrect password. Please check your password and try again.");
-    }
-
-    if (isLiveFirebaseConfigured && auth) {
-      try {
-        await signInWithEmailAndPassword(auth, email, password);
-      } catch (e) {
-        console.warn("Live Firebase login skipped, proceeding with profile check:", e);
-      }
     }
 
     setCurrentUser(userFromDb);
