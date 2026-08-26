@@ -655,6 +655,14 @@ export const DataService = {
     throw new Error("Firebase is not configured. Cannot update user status.");
   },
 
+  async updateUserProfile(uid, data) {
+    if (isLiveFirebaseConfigured && db) {
+      await updateDoc(doc(db, "users", uid), data);
+      return true;
+    }
+    throw new Error("Firebase is not configured. Cannot update user profile.");
+  },
+
   async deleteUser(uid) {
     if (isLiveFirebaseConfigured && db) {
       await deleteDoc(doc(db, "users", uid));
@@ -728,6 +736,23 @@ export const DataService = {
       return true;
     }
     throw new Error("Firebase is not configured. Cannot end session.");
+  },
+
+  async deleteSession(sessionId) {
+    if (isLiveFirebaseConfigured && db) {
+      await deleteDoc(doc(db, "sessions", sessionId));
+      try {
+        const snap = await getDocs(collection(db, "attendance"));
+        const related = snap.docs.filter(d => d.data().sessionId === sessionId);
+        for (const r of related) {
+          await deleteDoc(doc(db, "attendance", r.id));
+        }
+      } catch (e) {
+        console.warn("Could not clean up attendance records for session:", e);
+      }
+      return true;
+    }
+    throw new Error("Firebase is not configured. Cannot delete session.");
   },
 
   // --- ATTENDANCE ---

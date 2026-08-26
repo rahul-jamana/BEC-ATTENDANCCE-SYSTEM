@@ -181,6 +181,16 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Update profile data in Firestore and active session
+  const updateProfile = async (updatedFields) => {
+    if (!userProfile?.uid) throw new Error("No user logged in.");
+    await DataService.updateUserProfile(userProfile.uid, updatedFields);
+    const newProfile = { ...userProfile, ...updatedFields };
+    setUserProfile(newProfile);
+    localStorage.setItem("bec_session_user", JSON.stringify(newProfile));
+    return newProfile;
+  };
+
   const value = {
     currentUser,
     userProfile,
@@ -192,6 +202,7 @@ export const AuthProvider = ({ children }) => {
     masterLoginAsUser,
     logout,
     refreshProfile,
+    updateProfile,
     loading
   };
 

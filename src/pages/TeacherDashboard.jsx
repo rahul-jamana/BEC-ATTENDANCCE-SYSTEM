@@ -6,11 +6,12 @@ import { TeacherPhotoModal } from "../components/TeacherPhotoModal";
 import { exportAttendancePDF, exportAttendanceExcel, exportTeacherSessionExcel } from "../utils/pdfExporter";
 import { 
   QrCode, School, Play, StopCircle, FileText, Download, Users, 
-  Sparkles, CheckCircle2, Clock, Filter, BookOpen, Layers, Camera
+  Sparkles, CheckCircle2, Clock, Filter, BookOpen, Layers, Camera,
+  Trash2, Edit3, Save, X, UserCog
 } from "lucide-react";
 
 export const TeacherDashboard = () => {
-  const { userProfile } = useAuth();
+  const { userProfile, updateProfile } = useAuth();
   const [subjects, setSubjects] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [attendanceLogs, setAttendanceLogs] = useState([]);
@@ -18,6 +19,15 @@ export const TeacherDashboard = () => {
   const [isProjectorOpen, setIsProjectorOpen] = useState(false);
   const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
   const [pendingSessionData, setPendingSessionData] = useState(null);
+
+  // Subject-wise filter state
+  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState("all");
+
+  // Edit Profile modal state
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+  const [profileForm, setProfileForm] = useState({ name: "", department: "CSE", email: "" });
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileSuccessMsg, setProfileSuccessMsg] = useState("");
 
   // Class Selection State (default 1st Year Sem 1)
   const [classForm, setClassForm] = useState({
@@ -112,6 +122,61 @@ export const TeacherDashboard = () => {
     loadTeacherData();
   };
 
+  // Delete a class session
+  const handleDeleteSession = async (sessionId, subjectName) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete the class session record for "${subjectName}"?\n\nThis will permanently remove the session and its attendance logs.`
+    );
+    if (!confirmed) return;
+
+    try {
+      await DataService.deleteSession(sessionId);
+      if (activeSession?.id === sessionId) {
+        setActiveSession(null);
+      }
+      await loadTeacherData();
+    } catch (e) {
+      alert("Failed to delete session: " + e.message);
+    }
+  };
+
+  // Open Edit Profile Modal
+  const handleOpenEditProfile = () => {
+    setProfileForm({
+      name: userProfile?.name || "",
+      department: userProfile?.department || "CSE",
+      email: userProfile?.email || ""
+    });
+    setProfileSuccessMsg("");
+    setIsEditProfileOpen(true);
+  };
+
+  // Save Edited Profile
+  const handleSaveProfile = async (e) => {
+    e.preventDefault();
+    if (!profileForm.name.trim()) {
+      alert("Name cannot be empty.");
+      return;
+    }
+
+    setIsSavingProfile(true);
+    try {
+      await updateProfile({
+        name: profileForm.name.trim(),
+        department: profileForm.department.trim(),
+        email: profileForm.email.trim()
+      });
+      setProfileSuccessMsg("✅ Profile updated successfully!");
+      setTimeout(() => {
+        setIsEditProfileOpen(false);
+      }, 1000);
+    } catch (err) {
+      alert("Failed to update profile: " + err.message);
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
   // Filtered session records for report generation
   const getSessionAttendanceCount = (sessionId) => {
     return attendanceLogs.filter(a => a.sessionId === sessionId).length;
@@ -132,13 +197,23 @@ export const TeacherDashboard = () => {
 
   const handleExportSessionExcel = (sess) => {
     const records = attendanceLogs.filter(a => a.sessionId === sess.id);
-    // Use new teacher Excel with embedded teacher photo + student selfies
     exportTeacherSessionExcel({
       session: sess,
       teacherProfile: userProfile,
       records
     });
   };
+
+  // Distinct list of subjects from all recorded sessions
+  const distinctSubjects = Array.from(
+    new Set(sessions.map(s => s.subjectName).filter(Boolean))
+  );
+
+  // Filter sessions by selected subject
+  const filteredSessions = sessions.filter(sess => {
+    if (selectedSubjectFilter === "all") return true;
+    return sess.subjectName === selectedSubjectFilter || sess.subjectId === selectedSubjectFilter;
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-100 via-sky-50 to-blue-100 pb-16">
@@ -155,6 +230,14 @@ export const TeacherDashboard = () => {
               Department: {userProfile?.department || "CSE"} • Faculty Portal &amp; Dynamic QR Class Generator
             </p>
           </div>
+
+          <button
+            onClick={handleOpenEditProfile}
+            className="px-4 py-2.5 bg-white/15 hover:bg-white/25 border border-white/30 text-white font-bold text-xs rounded-2xl shadow-sm transition-all flex items-center space-x-2 backdrop-blur-md cursor-pointer hover:scale-105"
+          >
+            <Edit3 className="w-4 h-4" />
+            <span>Edit Profile</span>
+          </button>
         </div>
 
         {/* Active Session Live Alert Banner (if a class is currently open) */}
@@ -311,14 +394,33 @@ export const TeacherDashboard = () => {
 
         {/* Past Class Sessions & Reports Log */}
         <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200 space-y-6">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
             <div>
               <h2 className="text-xl font-bold text-slate-900">Class Session History &amp; Reports</h2>
               <p className="text-xs text-slate-500">Filter, view, and export past classroom attendance reports</p>
             </div>
-            <span className="text-xs font-mono font-bold bg-slate-100 px-3 py-1 rounded-lg text-slate-600">
-              Total Sessions: {sessions.length}
-            </span>
+            
+            {/* Subject-Wise Filter Dropdown */}
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-blue-600 shrink-0" />
+              <label htmlFor="subject-filter-select" className="text-xs font-bold text-slate-600 whitespace-nowrap">Filter Subject:</label>
+              <select
+                id="subject-filter-select"
+                value={selectedSubjectFilter}
+                onChange={(e) => setSelectedSubjectFilter(e.target.value)}
+                className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500 cursor-pointer min-w-[180px]"
+              >
+                <option value="all">All Subjects ({sessions.length})</option>
+                {distinctSubjects.map(subName => {
+                  const count = sessions.filter(s => s.subjectName === subName).length;
+                  return (
+                    <option key={subName} value={subName}>
+                      {subName} ({count})
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -334,14 +436,16 @@ export const TeacherDashboard = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
-                {sessions.length === 0 ? (
+                {filteredSessions.length === 0 ? (
                   <tr>
                     <td colSpan="6" className="py-8 text-center text-slate-400">
-                      No class sessions recorded yet.
+                      {selectedSubjectFilter === "all" 
+                        ? "No class sessions recorded yet."
+                        : `No sessions recorded for "${selectedSubjectFilter}".`}
                     </td>
                   </tr>
                 ) : (
-                  sessions.slice().reverse().map((sess) => {
+                  filteredSessions.slice().reverse().map((sess) => {
                     const count = getSessionAttendanceCount(sess.id);
                     return (
                       <tr key={sess.id} className="hover:bg-slate-50/80 transition-colors">
@@ -362,19 +466,32 @@ export const TeacherDashboard = () => {
                             <Users className="w-3.5 h-3.5" /> {count} Students
                           </span>
                         </td>
-                        <td className="py-3.5 px-4 text-right space-x-2">
+                        <td className="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
+                          {/* Export PDF */}
                           <button
                             onClick={() => handleExportSessionPDF(sess)}
-                            className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg text-[11px] font-semibold inline-flex items-center gap-1 transition-colors"
+                            className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg text-[11px] font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                            title="Export PDF Report"
                           >
                             <FileText className="w-3 h-3" /> PDF
                           </button>
 
+                          {/* Export Excel */}
                           <button
                             onClick={() => handleExportSessionExcel(sess)}
-                            className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-[11px] font-semibold inline-flex items-center gap-1 transition-colors"
+                            className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-[11px] font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                            title="Export Excel Sheet"
                           >
                             <Download className="w-3 h-3" /> Excel
+                          </button>
+
+                          {/* Delete Session */}
+                          <button
+                            onClick={() => handleDeleteSession(sess.id, sess.subjectName)}
+                            className="px-2.5 py-1.5 bg-slate-50 hover:bg-red-50 text-slate-500 hover:text-red-600 border border-slate-200 hover:border-red-200 rounded-lg text-[11px] font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                            title="Delete Session Record"
+                          >
+                            <Trash2 className="w-3 h-3" /> Delete
                           </button>
                         </td>
                       </tr>
@@ -406,6 +523,99 @@ export const TeacherDashboard = () => {
         session={activeSession}
         onEndSession={handleEndSession}
       />
+
+      {/* Simple Edit Profile Modal */}
+      {isEditProfileOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-100 relative">
+            <div className="gradient-header text-white p-5 flex items-center justify-between">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
+                  <UserCog className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold">Edit Faculty Profile</h3>
+                  <p className="text-[11px] text-blue-100">Update your name &amp; department</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsEditProfileOpen(false)}
+                className="p-1.5 rounded-xl hover:bg-white/20 text-white transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveProfile} className="p-6 space-y-4">
+              {profileSuccessMsg && (
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-xl text-xs font-bold flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>{profileSuccessMsg}</span>
+                </div>
+              )}
+
+              {/* Full Name */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Full Name</label>
+                <input
+                  type="text"
+                  value={profileForm.name}
+                  onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+                  placeholder="e.g. Dr. Rajesh Sharma"
+                  required
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Department */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Department</label>
+                <select
+                  value={profileForm.department}
+                  onChange={(e) => setProfileForm({ ...profileForm, department: e.target.value })}
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                >
+                  {branches.map(b => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                  <option value="Basic Science">Basic Science</option>
+                  <option value="Humanities">Humanities</option>
+                </select>
+              </div>
+
+              {/* Email Address */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Email Address</label>
+                <input
+                  type="email"
+                  value={profileForm.email}
+                  onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
+                  placeholder="e.g. faculty@bec.edu.in"
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditProfileOpen(false)}
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingProfile}
+                  className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-700 hover:to-sky-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{isSavingProfile ? "Saving..." : "Save Changes"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
