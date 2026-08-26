@@ -1,11 +1,14 @@
 import React from "react";
 import { useAuth } from "../context/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { LogOut, Shield, GraduationCap, School } from "lucide-react";
 
 export const Navbar = () => {
   const { userProfile, role, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const isAuthPage = ["/login", "/signup", "/login/ayush"].includes(location.pathname);
 
   const handleLogout = async () => {
     const confirmed = window.confirm("Are you sure you want to logout?");
@@ -62,7 +65,7 @@ export const Navbar = () => {
           </div>
 
           {/* User Profile Pill & Actions */}
-          {userProfile && (
+          {!isAuthPage && userProfile && (
             <div className="flex items-center space-x-4">
               {getRoleBadge()}
 

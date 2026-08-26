@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import { QrCode, Lock, Mail, ArrowRight, UserCheck, Shield, School, GraduationCap, Eye, EyeOff } from "lucide-react";
@@ -9,8 +9,15 @@ export const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { login, demoLogin } = useAuth();
+  const { login, demoLogin, userProfile, role, status } = useAuth();
   const navigate = useNavigate();
+
+  // If already logged in, redirect to dashboard
+  useEffect(() => {
+    if (userProfile && role) {
+      redirectUserRole(role, status);
+    }
+  }, [userProfile, role, status]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
