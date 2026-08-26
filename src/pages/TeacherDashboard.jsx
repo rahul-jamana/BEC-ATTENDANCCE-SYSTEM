@@ -182,16 +182,17 @@ export const TeacherDashboard = () => {
     return attendanceLogs.filter(a => a.sessionId === sessionId).length;
   };
 
-  const handleExportSessionPDF = (sess) => {
+  const handleExportSessionPDF = async (sess) => {
     const records = attendanceLogs.filter(a => a.sessionId === sess.id);
-    exportAttendancePDF({
+    await exportAttendancePDF({
       title: `Class Session ${sess.subjectName}`,
       branch: sess.branch,
       year: sess.year,
       section: sess.section,
       semester: sess.semester,
       subject: sess.subjectName,
-      records
+      records,
+      session: sess
     });
   };
 

@@ -16,7 +16,7 @@ export const AdminDashboard = () => {
   const [sessions, setSessions] = useState([]);
   const [attendance, setAttendance] = useState([]);
   const [activeTab, setActiveTab] = useState("pending");
-  const [photoFilter, setPhotoFilter] = useState({ branch: "All", year: "All", section: "All" });
+  const [photoFilter, setPhotoFilter] = useState({ branch: "All", year: "All", section: "All", teacher: "All" });
   const [selectedPhoto, setSelectedPhoto] = useState(null);
 
   // New Subject Form
@@ -280,50 +280,35 @@ export const AdminDashboard = () => {
   // Approved students list for medical selection
   const approvedStudents = users.filter(u => u.role === "student" && u.status === "approved");
 
-  const studentPhotoEntries = attendance
-    .filter(record => record.livePhoto && record.livePhoto.startsWith("http"))
-    .filter(record => {
-      if (photoFilter.branch !== "All" && record.branch !== photoFilter.branch) return false;
-      if (photoFilter.year !== "All" && record.year !== photoFilter.year) return false;
-      if (photoFilter.section !== "All" && record.section !== photoFilter.section) return false;
-      return true;
-    })
-    .map(record => ({
-      id: record.id,
-      type: "student",
-      name: record.studentName || "Student",
-      rollNo: record.rollNo,
-      branch: record.branch,
-      year: record.year,
-      section: record.section,
-      semester: record.semester,
-      subjectName: record.subjectName,
-      imageUrl: record.livePhoto,
-      markedAt: record.markedAt
-    }))
-    .sort((a, b) => new Date(b.markedAt) - new Date(a.markedAt));
 
-  const teacherPhotoEntries = sessions
-    .filter(session => session.teacherPhoto && typeof session.teacherPhoto === "string" && session.teacherPhoto.startsWith("http"))
+  // Teacher class log entries for Photo Access tab (supports both Cloudinary URLs and data: base64 photos)
+  const teacherClassLogs = sessions
+    .filter(session => session.teacherPhoto && typeof session.teacherPhoto === "string" && (session.teacherPhoto.startsWith("http") || session.teacherPhoto.startsWith("data:")))
     .filter(session => {
       if (photoFilter.branch !== "All" && session.branch !== photoFilter.branch) return false;
       if (photoFilter.year !== "All" && session.year !== photoFilter.year) return false;
       if (photoFilter.section !== "All" && session.section !== photoFilter.section) return false;
+      if (photoFilter.teacher && photoFilter.teacher !== "All" && session.teacherName !== photoFilter.teacher) return false;
       return true;
     })
     .map(session => ({
       id: session.id,
-      type: "teacher",
-      name: session.teacherName || "Faculty",
+      teacherName: session.teacherName || "Faculty",
       branch: session.branch,
       year: session.year,
       section: session.section,
       semester: session.semester,
       subjectName: session.subjectName,
       imageUrl: session.teacherPhoto,
-      markedAt: session.createdAt || session.startedAt
+      createdAt: session.createdAt || session.startedAt,
+      studentsPresent: attendance.filter(a => a.sessionId === session.id).length
     }))
-    .sort((a, b) => new Date(b.markedAt || 0) - new Date(a.markedAt || 0));
+    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+  // Distinct teacher names for filter
+  const distinctTeacherNames = Array.from(
+    new Set(sessions.filter(s => s.teacherName).map(s => s.teacherName))
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-100 via-sky-50 to-blue-100 pb-12">
@@ -448,10 +433,18 @@ export const AdminDashboard = () => {
           <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 sm:p-8 shadow-sm border border-blue-100 space-y-6">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-100 pb-4">
               <div>
-                <h2 className="text-xl font-bold text-slate-900">Admin Photo Review</h2>
-                <p className="text-xs text-slate-500">Cloudinary-only student and faculty photo access, separated by role and filtered by class.</p>
+                <h2 className="text-xl font-bold text-slate-900">Faculty Class Photo Logs</h2>
+                <p className="text-xs text-slate-500">Live-verified faculty photos for each conducted class session, filtered by teacher and class.</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={photoFilter.teacher}
+                  onChange={(e) => setPhotoFilter({ ...photoFilter, teacher: e.target.value })}
+                  className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700"
+                >
+                  <option value="All">All Faculty</option>
+                  {distinctTeacherNames.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
                 <select
                   value={photoFilter.branch}
                   onChange={(e) => setPhotoFilter({ ...photoFilter, branch: e.target.value })}
@@ -479,81 +472,133 @@ export const AdminDashboard = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2"><ImageIcon className="w-4 h-4 text-blue-600" /> Student Live Photos</h3>
-                  <span className="text-xs font-mono font-bold bg-blue-50 text-blue-800 border border-blue-200 px-2.5 py-1 rounded-lg">{studentPhotoEntries.length}</span>
-                </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-mono font-bold bg-sky-50 text-sky-800 border border-sky-200 px-3 py-1 rounded-lg">
+                Showing: {teacherClassLogs.length} Class Sessions
+              </span>
+            </div>
 
-                {studentPhotoEntries.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
-                    No student photos found for the selected filters.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {studentPhotoEntries.map(item => (
-                      <div key={item.id} className="border border-slate-200 rounded-2xl overflow-hidden bg-slate-50 shadow-sm">
-                        <img src={item.imageUrl} alt={item.name} className="w-full h-40 object-cover cursor-pointer" onClick={() => setSelectedPhoto(item.imageUrl)} />
-                        <div className="p-3 space-y-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="font-bold text-slate-900 text-sm">{item.name}</p>
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">Student</span>
-                          </div>
-                          <p className="text-[11px] text-slate-600 font-mono">{item.rollNo || "Roll N/A"}</p>
-                          <p className="text-[11px] text-slate-600">{item.branch} • {item.year} • Sec {item.section}</p>
-                          <p className="text-[11px] text-slate-600">{item.subjectName}</p>
-                          <p className="text-[10px] text-slate-500">{new Date(item.markedAt).toLocaleString()}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2"><Camera className="w-4 h-4 text-sky-600" /> Teacher Photos</h3>
-                  <span className="text-xs font-mono font-bold bg-sky-50 text-sky-800 border border-sky-200 px-2.5 py-1 rounded-lg">{teacherPhotoEntries.length}</span>
-                </div>
-
-                {teacherPhotoEntries.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
-                    No teacher photos found for the selected filters.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {teacherPhotoEntries.map(item => (
-                      <div key={item.id} className="border border-slate-200 rounded-2xl overflow-hidden bg-slate-50 shadow-sm">
-                        <img src={item.imageUrl} alt={item.name} className="w-full h-40 object-cover cursor-pointer" onClick={() => setSelectedPhoto(item.imageUrl)} />
-                        <div className="p-3 space-y-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="font-bold text-slate-900 text-sm">{item.name}</p>
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 font-bold">Faculty</span>
-                          </div>
-                          <p className="text-[11px] text-slate-600">{item.branch} • {item.year} • Sec {item.section}</p>
-                          <p className="text-[11px] text-slate-600">{item.subjectName}</p>
-                          <p className="text-[10px] text-slate-500">{new Date(item.markedAt || Date.now()).toLocaleString()}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-y border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                    <th className="py-3 px-3">Photo</th>
+                    <th className="py-3 px-3">Faculty Name</th>
+                    <th className="py-3 px-3">Subject / Class</th>
+                    <th className="py-3 px-3">Roster (Branch/Yr/Sec)</th>
+                    <th className="py-3 px-3">Semester</th>
+                    <th className="py-3 px-3">Session Date & Time</th>
+                    <th className="py-3 px-3">Students</th>
+                    <th className="py-3 px-3 text-center">View</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs">
+                  {teacherClassLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" className="py-10 text-center text-slate-400 text-sm">
+                        No faculty class photos found for the selected filters.
+                      </td>
+                    </tr>
+                  ) : (
+                    teacherClassLogs.map(log => (
+                      <tr key={log.id} className="hover:bg-blue-50/40 transition-colors">
+                        <td className="py-3 px-3">
+                          <img
+                            src={log.imageUrl}
+                            alt={log.teacherName}
+                            className="w-12 h-12 rounded-xl object-cover border-2 border-blue-200 cursor-pointer hover:scale-110 transition-transform shadow-sm"
+                            onClick={() => setSelectedPhoto(log)}
+                          />
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className="font-bold text-slate-900">{log.teacherName}</span>
+                          <br />
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-800 font-bold">Faculty</span>
+                        </td>
+                        <td className="py-3 px-3 font-semibold text-slate-800">{log.subjectName || "—"}</td>
+                        <td className="py-3 px-3">
+                          <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded font-semibold text-[11px]">
+                            {log.branch} | {log.year} | Sec {log.section}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-slate-600">Sem {log.semester}</td>
+                        <td className="py-3 px-3 text-slate-500 font-mono text-[11px]">
+                          {log.createdAt ? new Date(log.createdAt).toLocaleString() : "—"}
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-full text-emerald-700 font-bold">
+                            <Users className="w-3.5 h-3.5" /> {log.studentsPresent}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-center">
+                          <button
+                            onClick={() => setSelectedPhoto(log)}
+                            className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-[11px] font-bold transition-colors cursor-pointer"
+                          >
+                            Details
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
 
+        {/* Full Photo Detail Modal */}
         {selectedPhoto && (
-          <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-950/80 p-4" onClick={() => setSelectedPhoto(null)}>
-            <div className="relative max-w-3xl w-full rounded-3xl bg-white p-3 shadow-2xl" onClick={e => e.stopPropagation()}>
+          <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-950/80 backdrop-blur-xs p-4" onClick={() => setSelectedPhoto(null)}>
+            <div className="relative max-w-lg w-full rounded-3xl bg-white shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
               <button
                 onClick={() => setSelectedPhoto(null)}
-                className="absolute top-3 right-3 z-10 bg-slate-900/80 text-white rounded-full p-2 hover:bg-slate-700"
+                className="absolute top-3 right-3 z-10 bg-slate-900/80 text-white rounded-full p-2 hover:bg-slate-700 cursor-pointer"
               >
                 ✕
               </button>
-              <img src={selectedPhoto} alt="Selected photo preview" className="w-full max-h-[80vh] object-contain rounded-2xl" />
+
+              {/* If selectedPhoto is an object (teacher class log) show rich detail */}
+              {typeof selectedPhoto === "object" ? (
+                <div>
+                  <img
+                    src={selectedPhoto.imageUrl}
+                    alt={selectedPhoto.teacherName}
+                    className="w-full h-64 object-cover"
+                  />
+                  <div className="p-5 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-extrabold text-slate-900">{selectedPhoto.teacherName}</h3>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 font-bold">Faculty Verified ✓</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                        <p className="text-slate-400 text-[10px] uppercase font-bold mb-0.5">Subject / Class</p>
+                        <p className="font-bold text-slate-800">{selectedPhoto.subjectName || "—"}</p>
+                      </div>
+                      <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                        <p className="text-slate-400 text-[10px] uppercase font-bold mb-0.5">Roster</p>
+                        <p className="font-bold text-slate-800">{selectedPhoto.branch} | {selectedPhoto.year} | Sec {selectedPhoto.section}</p>
+                      </div>
+                      <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                        <p className="text-slate-400 text-[10px] uppercase font-bold mb-0.5">Semester</p>
+                        <p className="font-bold text-slate-800">Sem {selectedPhoto.semester}</p>
+                      </div>
+                      <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                        <p className="text-slate-400 text-[10px] uppercase font-bold mb-0.5">Students Present</p>
+                        <p className="font-bold text-emerald-700">{selectedPhoto.studentsPresent} Students</p>
+                      </div>
+                      <div className="col-span-2 bg-slate-50 rounded-xl p-3 border border-slate-100">
+                        <p className="text-slate-400 text-[10px] uppercase font-bold mb-0.5">Session Date & Time</p>
+                        <p className="font-bold text-slate-800">{selectedPhoto.createdAt ? new Date(selectedPhoto.createdAt).toLocaleString() : "—"}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <img src={selectedPhoto} alt="Selected photo preview" className="w-full max-h-[80vh] object-contain" />
+              )}
             </div>
           </div>
         )}

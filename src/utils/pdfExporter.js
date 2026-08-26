@@ -106,8 +106,10 @@ const applyTableHeader = (ws, rowNum, headers) => {
 // PDF EXPORT (unchanged)
 // ─────────────────────────────────────────────
 
-export const exportAttendancePDF = ({ title, branch, year, section, semester, subject, records }) => {
+export const exportAttendancePDF = async ({ title, branch, year, section, semester, subject, records, session }) => {
   const doc = new jsPDF();
+
+  // ── Header Banner ──
   doc.setFillColor(21, 101, 192);
   doc.rect(0, 0, 210, 28, "F");
   doc.setTextColor(255, 255, 255);
@@ -117,11 +119,47 @@ export const exportAttendancePDF = ({ title, branch, year, section, semester, su
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
   doc.text(`Official Attendance Report — ${title || "Class Summary"}`, 14, 21);
+
+  // ── Session/Class Info Row ──
   doc.setTextColor(30, 41, 59);
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
-  doc.text(`Branch: ${branch || "All"} | Year: ${year || "All"} | Section: ${section || "All"}`, 14, 36);
-  doc.text(`Semester: ${semester || "All"} | Subject: ${subject || "All"} | Date: ${new Date().toLocaleDateString()}`, 14, 42);
+  let infoY = 36;
+
+  // If session has teacher photo, embed it
+  if (session?.teacherPhoto) {
+    try {
+      const tImg = await fetchImageBase64(session.teacherPhoto);
+      if (tImg) {
+        doc.addImage(`data:image/${tImg.extension};base64,${tImg.base64}`, tImg.extension.toUpperCase(), 165, 31, 22, 22, undefined, "FAST");
+        doc.setDrawColor(21, 101, 192);
+        doc.setLineWidth(0.5);
+        doc.roundedRect(164.5, 30.5, 23, 23, 2, 2, "S");
+        doc.setFontSize(7);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(21, 101, 192);
+        doc.text("Faculty ✓", 170, 56);
+      }
+    } catch (_) {}
+  }
+
+  doc.setTextColor(30, 41, 59);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  if (session?.teacherName) {
+    doc.text(`Faculty: ${session.teacherName}`, 14, infoY);
+    infoY += 6;
+  }
+  doc.text(`Branch: ${branch || "All"} | Year: ${year || "All"} | Section: ${section || "All"}`, 14, infoY);
+  infoY += 6;
+  doc.text(`Semester: ${semester || "All"} | Subject: ${subject || "All"} | Date: ${new Date().toLocaleDateString()}`, 14, infoY);
+  infoY += 6;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text(`Total Students Present: ${records.length}`, 14, infoY);
+  infoY += 6;
+
+  // ── Student Table (text columns) ──
   const tableColumn = ["#", "Roll No", "Student Name", "Branch", "Section", "Status", "Time Marked"];
   const tableRows = records.map((rec, index) => [
     index + 1,
@@ -132,15 +170,86 @@ export const exportAttendancePDF = ({ title, branch, year, section, semester, su
     rec.status ? rec.status.toUpperCase() : "PRESENT",
     rec.markedAt ? new Date(rec.markedAt).toLocaleString() : "-",
   ]);
+
   autoTable(doc, {
     head: [tableColumn],
     body: tableRows,
-    startY: 48,
+    startY: infoY,
     theme: "striped",
-    headStyles: { fillColor: [21, 101, 192], textColor: 255, fontSize: 10, fontStyle: "bold" },
-    styles: { fontSize: 9, cellPadding: 3 },
+    headStyles: { fillColor: [21, 101, 192], textColor: 255, fontSize: 9, fontStyle: "bold" },
+    styles: { fontSize: 8, cellPadding: 2, minCellHeight: 10 },
     alternateRowStyles: { fillColor: [240, 246, 255] },
   });
+
+  // ── Student Photo Grid Page ──
+  const photosToEmbed = records.filter(r => r.livePhoto);
+  if (photosToEmbed.length > 0) {
+    doc.addPage();
+    doc.setFillColor(21, 101, 192);
+    doc.rect(0, 0, 210, 16, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text("Student Live Verification Photos", 14, 11);
+
+    let px = 14;
+    let py = 22;
+    const imgW = 28;
+    const imgH = 28;
+    const labelH = 12;
+    const gapX = 6;
+    const gapY = 8;
+    const colsPerRow = 5;
+    let col = 0;
+
+    for (const rec of photosToEmbed) {
+      try {
+        const imgData = await fetchImageBase64(rec.livePhoto);
+        if (imgData) {
+          // Blue border around photo
+          doc.setDrawColor(21, 101, 192);
+          doc.setLineWidth(0.4);
+          doc.roundedRect(px - 0.5, py - 0.5, imgW + 1, imgH + 1, 1, 1, "S");
+
+          doc.addImage(
+            `data:image/${imgData.extension};base64,${imgData.base64}`,
+            imgData.extension.toUpperCase(),
+            px, py, imgW, imgH, undefined, "FAST"
+          );
+
+          // Name + Roll label under photo
+          doc.setFontSize(6);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(30, 41, 59);
+          const nameText = (rec.studentName || "Student").substring(0, 16);
+          doc.text(nameText, px + imgW / 2, py + imgH + 4, { align: "center" });
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(5.5);
+          doc.setTextColor(100, 116, 139);
+          doc.text(rec.rollNo || "", px + imgW / 2, py + imgH + 7.5, { align: "center" });
+          doc.text(
+            rec.markedAt ? new Date(rec.markedAt).toLocaleTimeString() : "",
+            px + imgW / 2, py + imgH + 10.5, { align: "center" }
+          );
+        }
+      } catch (_) {}
+
+      col++;
+      if (col >= colsPerRow) {
+        col = 0;
+        px = 14;
+        py += imgH + labelH + gapY;
+        // New page if needed
+        if (py + imgH + labelH > 285) {
+          doc.addPage();
+          py = 14;
+        }
+      } else {
+        px += imgW + gapX;
+      }
+    }
+  }
+
   const filename = `BEC_Attendance_${branch || "All"}_${subject || "Report"}_${Date.now()}.pdf`;
   doc.save(filename);
 };
