@@ -242,6 +242,27 @@ export const AyushMasterPortal = () => {
     }
   };
 
+  // Filtered Users computation for Tab 2 and Tab 3
+  const filteredUsers = users.filter((u) => {
+    if (userRoleFilter !== "all" && u.role !== userRoleFilter) return false;
+    if (userRoleFilter === "student" || u.role === "student") {
+      if (userBranchFilter !== "all" && u.branch !== userBranchFilter) return false;
+      if (userYearFilter !== "all" && u.year !== userYearFilter) return false;
+      if (userSectionFilter !== "all" && u.section !== userSectionFilter) return false;
+    }
+    if (userSearchQuery.trim()) {
+      const q = userSearchQuery.toLowerCase().trim();
+      const matchName = u.name?.toLowerCase().includes(q);
+      const matchEmail = u.email?.toLowerCase().includes(q);
+      const matchRoll = u.rollNo?.toLowerCase().includes(q);
+      const matchDept = u.department?.toLowerCase().includes(q);
+      const matchSub = u.subjectName?.toLowerCase().includes(q);
+      const matchBranch = u.branch?.toLowerCase().includes(q);
+      if (!matchName && !matchEmail && !matchRoll && !matchDept && !matchSub && !matchBranch) return false;
+    }
+    return true;
+  });
+
   // ──────────────────────────────────────────────────────────────
   // VIEW 1: MASTER LOGIN GATE SCREEN (When Not Authenticated)
   // ──────────────────────────────────────────────────────────────
