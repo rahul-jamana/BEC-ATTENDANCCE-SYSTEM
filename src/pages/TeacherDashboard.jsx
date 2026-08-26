@@ -19,12 +19,12 @@ export const TeacherDashboard = () => {
   const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
   const [pendingSessionData, setPendingSessionData] = useState(null);
 
-  // Class Selection State
+  // Class Selection State (default 1st Year Sem 1)
   const [classForm, setClassForm] = useState({
     branch: "CSE",
-    year: "2nd",
+    year: "1st",
     section: "A",
-    semester: "3",
+    semester: "1",
     subjectId: ""
   });
 
@@ -156,6 +156,49 @@ export const TeacherDashboard = () => {
             </p>
           </div>
         </div>
+
+        {/* Active Session Live Alert Banner (if a class is currently open) */}
+        {activeSession && (
+          <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-3xl p-5 sm:p-6 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4 animate-in fade-in">
+            <div className="flex items-center space-x-3.5">
+              <span className="relative flex h-4 w-4">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-4 w-4 bg-white"></span>
+              </span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                    Live Session Ongoing
+                  </span>
+                  <span className="text-xs font-mono opacity-90">
+                    {activeSession.branch} • {activeSession.year} Year • Sec {activeSession.section} (Sem {activeSession.semester})
+                  </span>
+                </div>
+                <h3 className="text-lg sm:text-xl font-extrabold mt-0.5">
+                  {activeSession.subjectName}
+                </h3>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 w-full md:w-auto">
+              <button
+                onClick={() => setIsProjectorOpen(true)}
+                className="flex-1 md:flex-none px-4 py-2.5 bg-white text-emerald-800 hover:bg-emerald-50 font-bold rounded-xl text-xs shadow-md transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
+              >
+                <QrCode className="w-4 h-4" />
+                <span>Show Projector QR</span>
+              </button>
+
+              <button
+                onClick={() => handleEndSession(activeSession.id)}
+                className="flex-1 md:flex-none px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs shadow-md transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
+              >
+                <StopCircle className="w-4 h-4" />
+                <span>End Class Session</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Start Class Form Card */}
         <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 sm:p-8 shadow-sm border border-blue-100 space-y-6">
