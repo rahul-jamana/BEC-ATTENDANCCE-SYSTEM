@@ -264,90 +264,92 @@ export const exportTeacherSessionExcel = async ({ session, teacherProfile, recor
   wb.creator = "BEC Attendance System";
   wb.created = new Date();
 
-  // ── Sheet 1: Session Info & Teacher Details ──────────────────────
-  const infoSheet = wb.addWorksheet("Session Info");
+  // ── Single Unified Sheet: Session Info + Student Attendance ────────
+  const ws = wb.addWorksheet("Class Attendance Report");
 
-  applyCollegeBanner(infoSheet, 5);
+  // Total columns = 11 (A to K)
+  applyCollegeBanner(ws, 11);
 
-  // Column widths for info sheet
-  [18, 28, 22, 22, 20].forEach((w, i) => {
-    infoSheet.getColumn(i + 1).width = w;
-  });
+  // Column widths
+  const cols = [16, 24, 26, 26, 12, 12, 10, 24, 18, 22, 14];
+  cols.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
 
-  // Teacher live photo (top-left, rows 4-9)
+  // ── 1. Top Section: Teacher Live Photo & Session Metadata (Rows 4-11) ──
   const teacherImgData = session?.teacherPhoto
     ? await fetchImageBase64(session.teacherPhoto)
     : null;
 
   if (teacherImgData) {
     const imgId = wb.addImage({ base64: teacherImgData.base64, extension: teacherImgData.extension });
-    infoSheet.addImage(imgId, { tl: { col: 0, row: 3 }, ext: { width: 110, height: 110 } });
-    for (let r = 4; r <= 10; r++) infoSheet.getRow(r).height = 18;
+    ws.addImage(imgId, { tl: { col: 0, row: 3 }, ext: { width: 105, height: 105 } });
+    for (let r = 4; r <= 11; r++) ws.getRow(r).height = 18;
   }
 
-  // Label row
-  const labelRow = infoSheet.getRow(3);
-  labelRow.getCell(2).value = "FACULTY VERIFIED LIVE PHOTO";
+  // Header for metadata
+  const labelRow = ws.getRow(3);
+  labelRow.getCell(1).value = "📸 FACULTY";
+  labelRow.getCell(1).font = { bold: true, color: { argb: BEC_BLUE }, size: 10 };
+  labelRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
+  labelRow.getCell(2).value = "CLASS & FACULTY DETAILS";
   labelRow.getCell(2).font = { bold: true, color: { argb: BEC_BLUE }, size: 11 };
   labelRow.getCell(2).alignment = { vertical: "middle" };
-  labelRow.height = 20;
+  labelRow.height = 22;
 
-  // Teacher & session details starting from col B row 4
   const sessionDetails = [
-    ["Faculty Name", session?.teacherName || teacherProfile?.name || ""],
+    ["Faculty Name", session?.teacherName || teacherProfile?.name || "Faculty"],
     ["Department", teacherProfile?.department || "CSE"],
     ["Subject", session?.subjectName || ""],
     ["Branch / Year / Section", `${session?.branch || ""} | ${session?.year || ""} | Sec-${session?.section || ""}`],
     ["Semester", `Semester ${session?.semester || ""}`],
     ["Session Date & Time", session?.createdAt ? new Date(session.createdAt).toLocaleString("en-IN") : ""],
-    ["Total Students Present", records?.length || 0],
+    ["Total Students Present", `${records?.length || 0} Students`],
     ["Report Generated", new Date().toLocaleString("en-IN")],
   ];
 
   sessionDetails.forEach(([label, value], i) => {
-    const row = infoSheet.getRow(4 + i);
+    const row = ws.getRow(4 + i);
     const labelCell = row.getCell(2);
     const valCell = row.getCell(3);
     labelCell.value = label;
-    labelCell.font = { bold: true, color: { argb: BEC_BLUE } };
+    labelCell.font = { bold: true, color: { argb: BEC_BLUE }, size: 9.5 };
     labelCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF0F4FF" } };
     labelCell.border = { right: { style: "thin", color: { argb: "FFBBDEFB" } } };
     valCell.value = String(value);
-    valCell.font = { bold: false, size: 10 };
+    valCell.font = { bold: false, size: 9.5 };
     row.height = 18;
   });
 
-  // ── Sheet 2: Student Attendance with Live Selfie Photos ────────────
-  const attSheet = wb.addWorksheet("Student Attendance");
+  // ── 2. Middle Divider Row (Row 13) ──
+  const divRow = ws.getRow(13);
+  ws.mergeCells("A13:K13");
+  divRow.getCell(1).value = "📋 VERIFIED STUDENT ATTENDANCE ROSTER";
+  divRow.getCell(1).fill = headerFill(BEC_BLUE_LIGHT);
+  divRow.getCell(1).font = boldWhite(11);
+  divRow.getCell(1).alignment = centerMiddle;
+  divRow.height = 24;
 
-  applyCollegeBanner(attSheet, 10);
-
-  // Column widths
-  const attCols = [10, 6, 14, 24, 10, 10, 10, 22, 20, 18, 12];
-  attCols.forEach((w, i) => { attSheet.getColumn(i + 1).width = w; });
-
-  // Table header at row 3
-  applyTableHeader(attSheet, 3, [
+  // ── 3. Table Headers (Row 14) ──
+  applyTableHeader(ws, 14, [
     "📸 Selfie", "S.No", "Roll No", "Student Name",
     "Branch", "Section", "Sem", "Subject",
     "Verification", "Time Marked", "Status",
   ]);
 
-  // Data rows starting at row 4
+  // ── 4. Student Rows (Rows 15+) ──
   for (let i = 0; i < records.length; i++) {
     const rec = records[i];
-    const rowNum = i + 4; // 1-based Excel row
-    const exRow = attSheet.getRow(rowNum);
+    const rowNum = i + 15; // 1-based Excel row starting at 15
+    const exRow = ws.getRow(rowNum);
     exRow.height = 58;
 
     const cells = [
       [2, i + 1],
-      [3, rec.rollNo || ""],
-      [4, rec.studentName || ""],
+      [3, rec.rollNo || "N/A"],
+      [4, rec.studentName || "N/A"],
       [5, rec.branch || ""],
       [6, rec.section || ""],
       [7, `Sem ${rec.semester || ""}`],
-      [8, rec.subjectName || ""],
+      [8, rec.subjectName || session?.subjectName || ""],
       [9, rec.medicalExemption ? "Medical" : rec.markedByAdmin ? "Admin" : "Live Photo + QR"],
       [10, rec.markedAt ? new Date(rec.markedAt).toLocaleString("en-IN") : ""],
       [11, "✅ PRESENT"],
@@ -356,20 +358,19 @@ export const exportTeacherSessionExcel = async ({ session, teacherProfile, recor
     cells.forEach(([col, val]) => {
       const cell = exRow.getCell(col);
       cell.value = val;
-      cell.alignment = { vertical: "middle", horizontal: col === 4 ? "left" : "center" };
+      cell.alignment = { vertical: "middle", horizontal: [3, 4, 8].includes(col) ? "left" : "center" };
       if (col === 11) cell.font = { color: { argb: GREEN }, bold: true };
       if (i % 2 === 1) {
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: STRIPE } };
       }
     });
 
-    // Student live selfie photo in column A
+    // Student live selfie photo in Column A
     if (rec.livePhoto) {
       const imgData = await fetchImageBase64(rec.livePhoto);
       if (imgData) {
         const imgId = wb.addImage({ base64: imgData.base64, extension: imgData.extension });
-        // 0-based: row = rowNum - 1, col = 0 (column A)
-        attSheet.addImage(imgId, {
+        ws.addImage(imgId, {
           tl: { col: 0, row: rowNum - 1 },
           ext: { width: 52, height: 52 },
         });
@@ -379,7 +380,17 @@ export const exportTeacherSessionExcel = async ({ session, teacherProfile, recor
     exRow.commit();
   }
 
-  const filename = `BEC_Teacher_Session_${session?.subjectName || "Report"}_${session?.branch || ""}_Sec${session?.section || ""}_${Date.now()}.xlsx`;
+  // If no students yet
+  if (records.length === 0) {
+    const emptyRow = ws.getRow(15);
+    ws.mergeCells("A15:K15");
+    emptyRow.getCell(1).value = "No students attended this class session.";
+    emptyRow.getCell(1).alignment = centerMiddle;
+    emptyRow.getCell(1).font = { italic: true, color: { argb: "FF888888" } };
+    emptyRow.height = 30;
+  }
+
+  const filename = `BEC_Class_Session_${session?.subjectName || "Report"}_${session?.branch || ""}_Sec${session?.section || ""}_${Date.now()}.xlsx`;
   await downloadExcelWorkbook(wb, filename);
 };
 
