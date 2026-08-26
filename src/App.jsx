@@ -12,7 +12,15 @@ import { AyushMasterPortal } from "./pages/AyushMasterPortal";
 
 // Role & Status Protected Route Wrappers
 const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { userProfile, role, status } = useAuth();
+  const { userProfile, role, status, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   if (!userProfile) {
     return <Navigate to="/login" replace />;
@@ -35,7 +43,14 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 
 // Root Redirect Component
 const HomeRedirect = () => {
-  const { userProfile, role, status } = useAuth();
+  const { userProfile, role, status, loading } = useAuth();
+  if (loading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
   if (!userProfile) return <Navigate to="/login" replace />;
   if (status === "pending") return <Navigate to="/pending" replace />;
   if (role === "admin") return <Navigate to="/admin" replace />;

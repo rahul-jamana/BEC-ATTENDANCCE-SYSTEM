@@ -744,13 +744,22 @@ export const DataService = {
       throw new Error("Firebase is not configured. Cannot mark attendance.");
     }
 
+    const normalizeStr = (v) => String(v || "").trim().toLowerCase().replace(/[\s-_]/g, "");
+
+    const studentBranch = normalizeStr(student?.branch);
+    const sessionBranch = normalizeStr(session?.branch);
+    const studentYear = normalizeStr(student?.year);
+    const sessionYear = normalizeStr(session?.year);
+    const studentSection = normalizeStr(student?.section);
+    const sessionSection = normalizeStr(session?.section);
+
     if (
-      student.branch !== session.branch ||
-      student.year !== session.year ||
-      student.section !== session.section
+      (studentBranch && sessionBranch && studentBranch !== sessionBranch) ||
+      (studentYear && sessionYear && studentYear !== sessionYear) ||
+      (studentSection && sessionSection && studentSection !== sessionSection)
     ) {
       throw new Error(
-        `This class is not for your section! Required: ${session.branch} ${session.year} Sec ${session.section}`
+        `This class is for ${session.branch} ${session.year} Sec ${session.section}! (Your roster is registered as ${student.branch || "Unknown"} ${student.year || ""} Sec ${student.section || ""})`
       );
     }
     if (!session.isActive) throw new Error("This class session has ended.");

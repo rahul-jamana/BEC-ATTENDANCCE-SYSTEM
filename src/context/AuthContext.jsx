@@ -13,13 +13,25 @@ const AuthContext = createContext();
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [userProfile, setUserProfile] = useState(null);
+  const [currentUser, setCurrentUser] = useState(() => {
+    const saved = localStorage.getItem("bec_session_user");
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [userProfile, setUserProfile] = useState(() => {
+    const saved = localStorage.getItem("bec_session_user");
+    return saved ? JSON.parse(saved) : null;
+  });
   const [loading, setLoading] = useState(true);
 
-  // Firebase Auth is the single source of truth for session.
-  // onAuthStateChanged fires on every page load — no localStorage needed.
+  // Sync session and listen to Firebase Auth
   useEffect(() => {
+    const saved = localStorage.getItem("bec_session_user");
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      setCurrentUser(parsed);
+      setUserProfile(parsed);
+    }
+
     if (!isLiveFirebaseConfigured || !auth) {
       setLoading(false);
       return;
@@ -32,20 +44,11 @@ export const AuthProvider = ({ children }) => {
           if (profile) {
             setCurrentUser(firebaseUser);
             setUserProfile(profile);
-          } else {
-            // Firebase Auth user exists but no Firestore profile — sign out
-            await signOut(auth);
-            setCurrentUser(null);
-            setUserProfile(null);
+            localStorage.setItem("bec_session_user", JSON.stringify(profile));
           }
         } catch (e) {
-          console.warn("Failed to load user profile:", e);
-          setCurrentUser(null);
-          setUserProfile(null);
+          console.warn("Failed to load profile on auth change:", e);
         }
-      } else {
-        setCurrentUser(null);
-        setUserProfile(null);
       }
       setLoading(false);
     });
@@ -78,7 +81,9 @@ export const AuthProvider = ({ children }) => {
     };
 
     await DataService.createUser(newProfile);
-    // onAuthStateChanged will auto-set currentUser & userProfile
+    setCurrentUser(newProfile);
+    setUserProfile(newProfile);
+    localStorage.setItem("bec_session_user", JSON.stringify(newProfile));
     return newProfile;
   };
 
@@ -96,6 +101,7 @@ export const AuthProvider = ({ children }) => {
         if (profile) {
           setCurrentUser(firebaseResult.user);
           setUserProfile(profile);
+          localStorage.setItem("bec_session_user", JSON.stringify(profile));
           return profile;
         }
         // Signed in but no Firestore profile found
@@ -137,6 +143,7 @@ export const AuthProvider = ({ children }) => {
 
     setCurrentUser(userFromDb);
     setUserProfile(userFromDb);
+    localStorage.setItem("bec_session_user", JSON.stringify(userFromDb));
     return userFromDb;
   };
 
@@ -147,23 +154,30 @@ export const AuthProvider = ({ children }) => {
   const masterLoginAsUser = async (profile) => {
     setCurrentUser(profile);
     setUserProfile(profile);
+    localStorage.setItem("bec_session_user", JSON.stringify(profile));
     return profile;
   };
 
   // Logout — signs out from Firebase Auth; onAuthStateChanged clears state
   const logout = async () => {
     if (isLiveFirebaseConfigured && auth) {
-      await signOut(auth);
+      try {
+        await signOut(auth);
+      } catch (e) {}
     }
     setCurrentUser(null);
     setUserProfile(null);
+    localStorage.removeItem("bec_session_user");
   };
 
   // Refresh profile from Firestore
   const refreshProfile = async () => {
     if (userProfile?.uid) {
       const updated = await DataService.getUserById(userProfile.uid);
-      if (updated) setUserProfile(updated);
+      if (updated) {
+        setUserProfile(updated);
+        localStorage.setItem("bec_session_user", JSON.stringify(updated));
+      }
     }
   };
 
