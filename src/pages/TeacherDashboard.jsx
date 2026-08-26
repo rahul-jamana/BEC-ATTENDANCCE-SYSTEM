@@ -61,11 +61,16 @@ export const TeacherDashboard = () => {
   const bputSubjects = DataService.getBputSubjectsForBranch(classForm.branch, classForm.semester);
 
   // Step 1: Form submission opens Teacher Photo Capture Modal
-  const handleInitiateSession = (e) => {
+  const handleInitiateSession = async (e) => {
     e.preventDefault();
     const selectedSub = bputSubjects.find(s => s.code === classForm.subjectId) || subjects.find(s => s.id === classForm.subjectId);
     const initialToken = `tok_${Math.random().toString(36).substring(2, 8)}`;
     const subName = selectedSub ? `${selectedSub.name} (${selectedSub.code || ''})` : (classForm.subjectId || "Class Lecture");
+
+    // End any previous active session for this teacher so old QR code is invalidated
+    if (activeSession?.id) {
+      await DataService.endSession(activeSession.id);
+    }
 
     const sessionPayload = {
       branch: classForm.branch,
@@ -75,7 +80,7 @@ export const TeacherDashboard = () => {
       subjectId: classForm.subjectId || "SUB101",
       subjectName: subName,
       teacherId: userProfile?.uid || "teacher_01",
-      teacherName: userProfile?.name || "Dr. Rajesh Sharma",
+      teacherName: userProfile?.name || "Faculty",
       token: initialToken,
       tokenGeneratedAt: Date.now(),
       expiresAt: Date.now() + 600000 // 10 min session duration
@@ -184,7 +189,16 @@ export const TeacherDashboard = () => {
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Year</label>
                 <select
                   value={classForm.year}
-                  onChange={(e) => setClassForm({ ...classForm, year: e.target.value })}
+                  onChange={(e) => {
+                    const yr = e.target.value;
+                    const semMap = { "1st": "1", "2nd": "3", "3rd": "5", "4th": "7" };
+                    setClassForm(prev => ({
+                      ...prev,
+                      year: yr,
+                      semester: semMap[yr] || prev.semester,
+                      subjectId: ""
+                    }));
+                  }}
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 cursor-pointer"
                 >
                   {years.map(y => <option key={y} value={y}>{y}</option>)}
