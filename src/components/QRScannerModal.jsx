@@ -252,20 +252,18 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/85 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-100 relative animate-in fade-in zoom-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/85 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto">
+      <div className="relative max-w-lg w-full max-h-[94dvh] sm:max-h-[90vh] bg-white rounded-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 my-auto">
         
         {/* Modal Header */}
-        <div className="gradient-header text-white p-5 flex items-center justify-between">
+        <div className="p-4 sm:p-5 bg-gradient-to-r from-blue-900 via-indigo-900 to-sky-900 text-white flex items-center justify-between shrink-0">
           <div className="flex items-center space-x-2.5">
-            <div className="w-9 h-9 rounded-xl bg-white p-1 flex items-center justify-center shadow-xs shrink-0">
-              <img src="/bec-logo.png" alt="BEC Logo" className="w-full h-full object-contain" />
+            <div className="p-2 rounded-xl bg-white/15 border border-white/20 text-white">
+              <Camera className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold leading-tight">Student Attendance Verification</h3>
-              <p className="text-[11px] text-blue-100">
-                {step === "selfie" ? "Step 1 of 2: Capture Live Photo" : "Step 2 of 2: Scan Classroom QR"}
-              </p>
+              <h3 className="font-extrabold text-sm sm:text-base leading-tight">Live Student QR Verification</h3>
+              <p className="text-[11px] text-sky-200">2-Step Anti-Proxy Camera Scanner</p>
             </div>
           </div>
           <button
@@ -274,39 +272,41 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
               stopQrScanner();
               onClose();
             }}
-            className="p-1.5 rounded-xl hover:bg-white/20 text-white transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-full hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+            aria-label="Close"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Step Stepper Progress Bar */}
-        <div className="bg-slate-100 px-5 py-2 flex items-center justify-between border-b border-slate-200 text-xs">
+        <div className="bg-slate-100 px-4 py-2.5 flex items-center justify-between border-b border-slate-200 text-xs shrink-0">
           <div className={`flex items-center space-x-1.5 font-bold ${step === 'selfie' ? 'text-blue-700' : 'text-emerald-700'}`}>
             <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] text-white font-mono ${step === 'selfie' ? 'bg-blue-600' : 'bg-emerald-600'}`}>
               {selfieDataUrl ? '✓' : '1'}
             </span>
-            <span>1. Capture Live Selfie</span>
+            <span className="text-[11px] sm:text-xs">1. Live Selfie</span>
           </div>
 
-          <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+          <ArrowRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
 
           <div className={`flex items-center space-x-1.5 font-bold ${step === 'qr' ? 'text-blue-700' : 'text-slate-400'}`}>
             <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] text-white font-mono ${step === 'qr' ? 'bg-blue-600' : 'bg-slate-300'}`}>
               2
             </span>
-            <span>2. Scan QR Code</span>
+            <span className="text-[11px] sm:text-xs">2. Scan Classroom QR</span>
           </div>
         </div>
 
-        <div className="p-5 space-y-4">
+        {/* Modal Scrollable Body */}
+        <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 text-xs">
           
           {/* Student Profile Info Tag */}
-          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 text-xs flex items-center justify-between gap-3">
-            <div>
+          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3 sm:p-3.5 text-xs flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
               <span className="text-slate-400 font-semibold block text-[10px] uppercase tracking-wider">Student Roster</span>
-              <span className="font-extrabold text-slate-800 text-sm">{studentProfile?.name}</span>
-              <span className="block text-[11px] text-slate-500 font-mono">Roll: {studentProfile?.rollNo} ({studentProfile?.branch} Sec-{studentProfile?.section})</span>
+              <span className="font-extrabold text-slate-800 text-sm block truncate">{studentProfile?.name}</span>
+              <span className="block text-[11px] text-slate-500 font-mono truncate">Roll: {studentProfile?.rollNo} ({studentProfile?.branch} Sec-{studentProfile?.section})</span>
             </div>
 
             {selfieDataUrl && (
@@ -321,22 +321,22 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
 
           {/* Success Message Banner */}
           {successMsg && (
-            <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 p-4 rounded-2xl flex items-start space-x-3 animate-in fade-in">
-              <CheckCircle2 className="w-6 h-6 text-emerald-600 flex-shrink-0 mt-0.5" />
+            <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 p-3.5 rounded-2xl flex items-start space-x-3 animate-in fade-in">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="font-bold text-sm">{successMsg}</p>
-                <p className="text-xs text-emerald-600 mt-1">Live photo verified &amp; saved with timestamp.</p>
+                <p className="font-bold text-xs sm:text-sm">{successMsg}</p>
+                <p className="text-[11px] text-emerald-700 mt-0.5">Attendance verified &amp; saved in real-time.</p>
               </div>
             </div>
           )}
 
           {/* Error Message Banner */}
           {errorMsg && (
-            <div className="bg-red-50 border border-red-300 text-red-800 p-4 rounded-2xl flex items-start space-x-3 animate-in fade-in">
-              <AlertTriangle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="bg-red-50 border border-red-300 text-red-800 p-3.5 rounded-2xl flex items-start space-x-3 animate-in fade-in">
+              <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="font-bold text-sm">Notice</p>
-                <p className="text-xs text-red-600 mt-0.5">{errorMsg}</p>
+                <p className="font-bold text-xs sm:text-sm">Notice</p>
+                <p className="text-[11px] text-red-700 mt-0.5">{errorMsg}</p>
               </div>
             </div>
           )}
@@ -348,21 +348,28 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
             <div className="space-y-4">
               <canvas ref={canvasRef} className="hidden" />
 
-              <div className="relative rounded-2xl overflow-hidden bg-slate-950 min-h-[260px] flex flex-col items-center justify-center border border-slate-200 shadow-inner">
+              <div className="relative rounded-2xl overflow-hidden bg-slate-950 aspect-[4/3] max-h-[280px] w-full flex flex-col items-center justify-center border border-slate-200 shadow-inner mx-auto">
                 {selfieDataUrl ? (
-                  <div className="relative w-full h-[260px] flex flex-col items-center justify-center p-2">
-                    <img src={selfieDataUrl} alt="Captured Selfie" className="h-[240px] w-auto rounded-xl object-contain shadow-md border-2 border-emerald-400" />
+                  <div className="relative w-full h-full flex flex-col items-center justify-center p-2">
+                    <img src={selfieDataUrl} alt="Captured Selfie" className="w-full h-full rounded-xl object-contain shadow-md border-2 border-emerald-400" />
                     <div className="absolute top-3 right-3 bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Selfie Captured
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Selfie Ready
                     </div>
                   </div>
                 ) : (
-                  <div className="relative w-full h-[260px] flex items-center justify-center">
-                    <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+                  <div className="relative w-full h-full flex items-center justify-center">
+                    <video 
+                      ref={videoRef} 
+                      autoPlay 
+                      playsInline 
+                      webkit-playsinline="true" 
+                      muted 
+                      className="w-full h-full object-cover" 
+                    />
                     {isSelfieCameraActive && (
                       <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                        <div className="w-48 h-48 border-2 border-dashed border-sky-400 rounded-full relative shadow-[0_0_0_9999px_rgba(15,23,42,0.45)]">
-                          <div className="absolute top-2 left-1/2 -translate-x-1/2 text-[10px] bg-slate-900/80 text-white px-2 py-0.5 rounded font-mono">
+                        <div className="w-40 h-40 sm:w-48 sm:h-48 border-2 border-dashed border-sky-400 rounded-full relative shadow-[0_0_0_9999px_rgba(15,23,42,0.45)]">
+                          <div className="absolute top-2 left-1/2 -translate-x-1/2 text-[10px] bg-slate-900/80 text-white px-2 py-0.5 rounded font-mono whitespace-nowrap">
                             Center Face
                           </div>
                         </div>
@@ -377,7 +384,7 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
                 <button
                   onClick={captureSelfie}
                   disabled={!isSelfieCameraActive}
-                  className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-700 hover:to-sky-700 disabled:opacity-50 text-white font-extrabold text-xs sm:text-sm rounded-2xl shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer"
+                  className="w-full min-h-[48px] py-3.5 bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-700 hover:to-sky-700 disabled:opacity-50 text-white font-extrabold text-xs sm:text-sm rounded-2xl shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-98"
                 >
                   <Camera className="w-4 h-4" />
                   <span>SNAP LIVE SELFIE PHOTO</span>
@@ -386,7 +393,7 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     onClick={retakeSelfie}
-                    className="py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
+                    className="min-h-[48px] py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors flex items-center justify-center space-x-1.5 cursor-pointer active:scale-98"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
                     <span>Retake</span>
@@ -394,10 +401,10 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
 
                   <button
                     onClick={proceedToQRScan}
-                    className="py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
+                    className="min-h-[48px] py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center justify-center space-x-1.5 cursor-pointer active:scale-98"
                   >
                     <QrCode className="w-4 h-4" />
-                    <span>SCAN QR CODE ➡️</span>
+                    <span>PROCEED TO QR ➡️</span>
                   </button>
                 </div>
               )}
@@ -409,12 +416,12 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
               ------------------------------------------------------------- */}
           {step === "qr" && (
             <div className="space-y-4">
-              <div className="relative rounded-2xl overflow-hidden bg-slate-950 min-h-[260px] flex flex-col items-center justify-center border border-slate-200 shadow-inner">
-                <div id="qr-reader-target" className="w-full h-full"></div>
+              <div className="relative rounded-2xl overflow-hidden bg-slate-950 aspect-[4/3] max-h-[280px] w-full flex flex-col items-center justify-center border border-slate-200 shadow-inner mx-auto">
+                <div id="qr-reader-target" className="w-full h-full flex items-center justify-center [&_video]:w-full [&_video]:h-full [&_video]:object-cover [&_video]:rounded-xl [&_img]:hidden"></div>
 
                 {isQrScannerActive && !isProcessing && (
                   <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                    <div className="w-52 h-52 border-2 border-blue-400/80 rounded-2xl relative shadow-[0_0_0_9999px_rgba(15,23,42,0.45)]">
+                    <div className="w-44 h-44 sm:w-52 sm:h-52 border-2 border-blue-400/80 rounded-2xl relative shadow-[0_0_0_9999px_rgba(15,23,42,0.45)]">
                       <div className="absolute -top-1 -left-1 w-5 h-5 border-t-4 border-l-4 border-blue-500 rounded-tl-lg"></div>
                       <div className="absolute -top-1 -right-1 w-5 h-5 border-t-4 border-r-4 border-blue-500 rounded-tr-lg"></div>
                       <div className="absolute -bottom-1 -left-1 w-5 h-5 border-b-4 border-l-4 border-blue-500 rounded-bl-lg"></div>
@@ -426,7 +433,7 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
                 {isProcessing && (
                   <div className="absolute inset-0 bg-slate-900/85 backdrop-blur-xs flex items-center justify-center text-white space-x-2 z-20">
                     <div className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
-                    <span className="text-sm font-bold">Verifying Live Photo &amp; Token...</span>
+                    <span className="text-xs sm:text-sm font-bold">Verifying Live Photo &amp; Token...</span>
                   </div>
                 )}
               </div>
@@ -438,11 +445,11 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
                     setStep("selfie");
                     startSelfieCamera();
                   }}
-                  className="text-blue-700 font-bold hover:underline cursor-pointer"
+                  className="text-blue-700 font-bold hover:underline cursor-pointer py-1"
                 >
                   ⬅️ Retake Live Selfie
                 </button>
-                <span className="text-slate-400 font-mono text-[11px]">Facing: Classroom Projector</span>
+                <span className="text-slate-400 font-mono text-[10px] sm:text-[11px]">Facing: Classroom Projector</span>
               </div>
             </div>
           )}
@@ -450,9 +457,9 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
         </div>
 
         {/* Modal Footer */}
-        <div className="bg-slate-50 px-5 py-3 border-t border-slate-200 flex justify-between items-center text-xs">
-          <span className="flex items-center gap-1 text-slate-500">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> Live Selfie Verified
+        <div className="bg-slate-50 px-4 sm:px-5 py-3 border-t border-slate-200 flex justify-between items-center text-xs shrink-0">
+          <span className="flex items-center gap-1 text-slate-500 text-[11px]">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> Anti-Proxy Shield Active
           </span>
           <button
             onClick={() => {
@@ -460,9 +467,9 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
               stopQrScanner();
               onClose();
             }}
-            className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold text-xs rounded-xl transition-colors cursor-pointer"
+            className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold text-xs rounded-xl transition-colors cursor-pointer active:scale-98"
           >
-            Close Scanner
+            Close
           </button>
         </div>
 

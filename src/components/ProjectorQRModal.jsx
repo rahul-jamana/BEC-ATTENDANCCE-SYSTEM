@@ -104,11 +104,12 @@ export const ProjectorQRModal = ({ isOpen, onClose, session, onEndSession }) => 
             </p>
           </div>
 
-          {/* QR Container with Glow */}
-          <div className="p-6 bg-white rounded-3xl shadow-2xl pulse-glow border-4 border-blue-500/50 inline-block">
+          {/* QR Container with Glow (Fully Responsive on Mobile) */}
+          <div className="p-3 sm:p-6 bg-white rounded-3xl shadow-2xl pulse-glow border-4 border-blue-500/50 w-[200px] h-[200px] sm:w-[260px] sm:h-[260px] flex items-center justify-center">
             <QRCodeSVG 
               value={qrPayload}
-              size={240}
+              size={220}
+              className="w-full h-full object-contain"
               level="H"
               includeMargin={true}
             />

@@ -113,8 +113,8 @@ export const StudentDashboard = () => {
   const medicalExemptionsCount = attendanceLogs.filter(l => l.medicalExemption || l.markedByAdmin).length;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-sky-50 to-blue-100 pb-16">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-sky-50 to-blue-100 pb-28 sm:pb-16">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-5 sm:space-y-6">
         
         {/* ========================================================
             HERO GREETING BANNER & INSTANT SCAN QR PROMINENT ACTION
@@ -871,6 +871,21 @@ export const StudentDashboard = () => {
           </div>
         </div>
       )}
+
+      {/* Floating Mobile Bottom Scan Bar for 1-thumb scanning on phones */}
+      <div className="fixed bottom-3 left-3 right-3 z-40 sm:hidden">
+        <button
+          onClick={() => setIsScannerOpen(true)}
+          className="w-full py-3.5 px-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 active:from-blue-700 active:to-sky-700 text-white font-extrabold text-sm rounded-2xl shadow-2xl shadow-blue-950/60 border border-white/20 flex items-center justify-center space-x-2.5 active:scale-98 transition-transform cursor-pointer"
+        >
+          <div className="p-1.5 bg-white/20 rounded-xl">
+            <Camera className="w-5 h-5 text-white" />
+          </div>
+          <span className="tracking-wide">📸 SCAN CLASSROOM QR CODE</span>
+          <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping ml-1"></div>
+        </button>
+      </div>
+
     </div>
   );
 };
