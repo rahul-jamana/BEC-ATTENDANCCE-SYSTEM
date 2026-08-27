@@ -460,7 +460,7 @@ export const AyushMasterPortal = () => {
               <GraduationCap className="w-4 h-4 text-emerald-600" />
             </div>
             <div className="text-3xl font-black text-emerald-900 mt-2">{studentCount}</div>
-            <div className="text-[11px] text-slate-500 mt-1">12 BPUT Branches</div>
+            <div className="text-[11px] text-slate-500 mt-1">{DataService.getDepartments().length} BPUT Branches</div>
           </div>
         </div>
 

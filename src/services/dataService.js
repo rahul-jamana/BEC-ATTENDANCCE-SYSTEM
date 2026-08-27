@@ -6,8 +6,8 @@ import {
 // Initial Seed Data for Instant Local Development & Testing
 // BPUT (Biju Patnaik University of Technology) Branches
 const DEFAULT_DEPARTMENTS = [
-  "CSE", "ECE", "EEE", "Electrical", "Mechanical", "Civil", "IT",
-  "Biotechnology", "Chemical", "Mining", "Automobile", "EIE"
+  "CSE", "Data Science", "ECE", "EEE", "Electrical", "Mechanical", "Civil", "IT",
+  "Agriculture", "Biotechnology", "Chemical", "Mining", "Automobile", "EIE"
 ];
 const DEFAULT_YEARS = ["1st", "2nd", "3rd", "4th"];
 const DEFAULT_SECTIONS = ["A", "B", "C", "D"];
@@ -79,6 +79,50 @@ const BPUT_CURRICULUM = {
       { name: "Blockchain Technology", code: "CS406" },
       { name: "Project-II", code: "CS492" },
       { name: "Seminar & Technical Writing", code: "CS493" },
+    ],
+  },
+
+  // ─── Data Science (CSE - Data Science) ───
+  "Data Science": {
+    "3": [
+      { name: "Data Structures & Algorithms", code: "DS201" },
+      { name: "Python for Data Science", code: "DS202" },
+      { name: "Discrete Mathematics", code: "DS203" },
+      { name: "Object Oriented Programming (Java/C++)", code: "DS204" },
+      { name: "Linear Algebra & Statistics", code: "MA201" },
+    ],
+    "4": [
+      { name: "Database Management & SQL", code: "DS205" },
+      { name: "Foundations of Data Science", code: "DS206" },
+      { name: "Computer Organization & Architecture", code: "DS207" },
+      { name: "Operating Systems", code: "DS208" },
+      { name: "Probability & Statistical Inference", code: "MA202" },
+    ],
+    "5": [
+      { name: "Machine Learning Techniques", code: "DS301" },
+      { name: "Big Data Technologies (Hadoop/Spark)", code: "DS302" },
+      { name: "Data Mining & Warehousing", code: "DS303" },
+      { name: "Computer Networks", code: "DS304" },
+      { name: "Data Visualization & Analytics", code: "DS305" },
+    ],
+    "6": [
+      { name: "Deep Learning & Neural Networks", code: "DS306" },
+      { name: "Natural Language Processing", code: "DS307" },
+      { name: "Cloud Computing for Data Science", code: "DS308" },
+      { name: "Artificial Intelligence", code: "DS309" },
+      { name: "Business Intelligence & Predictive Modeling", code: "DS310" },
+    ],
+    "7": [
+      { name: "Time Series Analysis & Forecasting", code: "DS401" },
+      { name: "Computer Vision", code: "DS402" },
+      { name: "Data Ethics, Governance & Privacy", code: "DS403" },
+      { name: "Project-I", code: "DS491" },
+    ],
+    "8": [
+      { name: "Generative AI & LLMs", code: "DS404" },
+      { name: "Reinforcement Learning", code: "DS405" },
+      { name: "Project-II", code: "DS492" },
+      { name: "Seminar & Technical Writing", code: "DS493" },
     ],
   },
 
@@ -332,6 +376,50 @@ const BPUT_CURRICULUM = {
       { name: "Blockchain Technology", code: "IT404" },
       { name: "Project-II", code: "IT492" },
       { name: "Seminar & Technical Writing", code: "IT493" },
+    ],
+  },
+
+  // ─── Agriculture (Agricultural Engineering & Technology) ───
+  Agriculture: {
+    "3": [
+      { name: "Soil Science & Agronomy", code: "AG201" },
+      { name: "Fluid Mechanics & Open Channel Flow", code: "AG202" },
+      { name: "Thermodynamics in Agriculture", code: "AG203" },
+      { name: "Farm Power & Tractor Technology", code: "AG204" },
+      { name: "Mathematics-III", code: "MA201" },
+    ],
+    "4": [
+      { name: "Soil Mechanics & Foundation", code: "AG205" },
+      { name: "Farm Machinery & Equipment", code: "AG206" },
+      { name: "Surveying & Leveling", code: "AG207" },
+      { name: "Crop Processing Engineering", code: "AG208" },
+      { name: "Environmental Engineering in Agriculture", code: "AG209" },
+    ],
+    "5": [
+      { name: "Soil & Water Conservation Engineering", code: "AG301" },
+      { name: "Irrigation & Drainage Engineering", code: "AG302" },
+      { name: "Post Harvest Technology", code: "AG303" },
+      { name: "Agricultural Structures & Environmental Control", code: "AG304" },
+      { name: "Heat & Mass Transfer in Food Processing", code: "AG305" },
+    ],
+    "6": [
+      { name: "Groundwater & Wells Technology", code: "AG306" },
+      { name: "Farm Machinery Design", code: "AG307" },
+      { name: "Dairy & Food Engineering", code: "AG308" },
+      { name: "Remote Sensing & GIS in Agriculture", code: "AG309" },
+      { name: "Renewable Energy in Agriculture", code: "AG310" },
+    ],
+    "7": [
+      { name: "Precision Agriculture & Drone Technology", code: "AG401" },
+      { name: "Watershed Planning & Management", code: "AG402" },
+      { name: "Food Packaging & Storage Technology", code: "AG403" },
+      { name: "Project-I", code: "AG491" },
+    ],
+    "8": [
+      { name: "Greenhouse Technology & Protected Cultivation", code: "AG404" },
+      { name: "Agribusiness Management & Entrepreneurship", code: "AG405" },
+      { name: "Project-II", code: "AG492" },
+      { name: "Seminar & Technical Writing", code: "AG493" },
     ],
   },
 
