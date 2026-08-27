@@ -12,7 +12,7 @@ import {
   Shield, UserCheck, UserX, Users, BookOpen, Upload, FileText, Download, 
   Trash2, Plus, RefreshCw, CheckCircle, AlertCircle, Layers, ClipboardCheck,
   HeartPulse, Sparkles, AlertTriangle, Camera, Image as ImageIcon,
-  Search, Filter, GraduationCap, Percent, CheckCircle2, Calendar, Clock
+  Search, Filter, GraduationCap, Percent, CheckCircle2, Calendar, Clock, School
 } from "lucide-react";
 
 export const AdminDashboard = () => {
