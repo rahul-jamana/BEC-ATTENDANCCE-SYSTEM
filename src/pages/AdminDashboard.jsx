@@ -555,9 +555,10 @@ export const AdminDashboard = () => {
       totalClasses: teacherSessions.length,
       uniqueSubjectsCount: uniqueSubjectsList.length,
       uniqueSubjectsList,
+      subjectsList: uniqueSubjectsList,
       totalStudentsScanned,
-      breakdownList,
-      sessionsList: teacherSessions
+      breakdownList: breakdownList || [],
+      sessionsList: teacherSessions || []
     };
   };
 
@@ -1252,7 +1253,7 @@ export const AdminDashboard = () => {
                             <div className="text-[11px] font-bold text-purple-700 uppercase tracking-wider mt-1">Total Classes Taken</div>
                           </div>
                           <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-center">
-                            <div className="text-2xl font-black text-blue-900">{stats.subjectsList.length}</div>
+                            <div className="text-2xl font-black text-blue-900">{stats.uniqueSubjectsCount || stats.subjectsList?.length || 0}</div>
                             <div className="text-[11px] font-bold text-blue-700 uppercase tracking-wider mt-1">Subjects Taught</div>
                           </div>
                           <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-center">
