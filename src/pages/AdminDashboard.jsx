@@ -458,10 +458,85 @@ export const AdminDashboard = () => {
     }))
     .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
+  // Delete teacher class session log & attendance records handler
+  const handleDeleteTeacherClassLog = async (sessionId, subjectName, teacherName) => {
+    if (!window.confirm(`Are you sure you want to delete the class session log for "${teacherName || "Faculty"} - ${subjectName || "Subject"}"? This will permanently delete the session record, photos, and all student attendance scans for this lecture.`)) return;
+    try {
+      await DataService.deleteSession(sessionId);
+      if (selectedPhoto && selectedPhoto.id === sessionId) {
+        setSelectedPhoto(null);
+      }
+      alert("✅ Class session log and attendance records deleted successfully.");
+      loadAdminData();
+    } catch (err) {
+      alert("Failed to delete session: " + err.message);
+    }
+  };
+
   // Distinct teacher names for filter
   const distinctTeacherNames = Array.from(
     new Set(sessions.filter(s => s.teacherName).map(s => s.teacherName))
   );
+
+  // Faculty Workload & Subject Class Metrics (Shows which madam/sir teaches which subjects and how many classes conducted)
+  const facultyWorkloadStats = useMemo(() => {
+    const teacherMap = new Map();
+
+    // Seed approved faculty users
+    users.filter(u => u.role === "teacher" && u.status === "approved").forEach(t => {
+      teacherMap.set(t.name.toLowerCase().trim(), {
+        name: t.name,
+        email: t.email,
+        department: t.department || "Faculty",
+        assignedSubject: t.subjectName || "",
+        totalSessions: 0,
+        subjectsMap: {},
+        sectionsMap: {},
+        totalStudentsAttended: 0,
+        lastClassAt: null,
+      });
+    });
+
+    // Populate actual conducted sessions
+    sessions.forEach(s => {
+      const tName = (s.teacherName || "Faculty").trim();
+      const key = tName.toLowerCase();
+      if (!teacherMap.has(key)) {
+        teacherMap.set(key, {
+          name: tName,
+          email: s.teacherEmail || "—",
+          department: s.branch || "Faculty",
+          assignedSubject: s.subjectName || "",
+          totalSessions: 0,
+          subjectsMap: {},
+          sectionsMap: {},
+          totalStudentsAttended: 0,
+          lastClassAt: null,
+        });
+      }
+
+      const entry = teacherMap.get(key);
+      entry.totalSessions += 1;
+
+      const subName = s.subjectName || "Subject";
+      entry.subjectsMap[subName] = (entry.subjectsMap[subName] || 0) + 1;
+
+      const secKey = `${s.branch} ${s.year} Sec-${s.section}`;
+      entry.sectionsMap[secKey] = (entry.sectionsMap[secKey] || 0) + 1;
+
+      const studentsCount = attendance.filter(a => a.sessionId === s.id).length;
+      entry.totalStudentsAttended += studentsCount;
+
+      const sessDate = s.createdAt || s.startedAt;
+      if (sessDate) {
+        if (!entry.lastClassAt || new Date(sessDate) > new Date(entry.lastClassAt)) {
+          entry.lastClassAt = sessDate;
+        }
+      }
+    });
+
+    return Array.from(teacherMap.values()).sort((a, b) => b.totalSessions - a.totalSessions);
+  }, [users, sessions, attendance]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-100 via-sky-50 to-blue-100 pb-12">
@@ -583,119 +658,265 @@ export const AdminDashboard = () => {
         </div>
 
         {activeTab === "photos" && (
-          <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 sm:p-8 shadow-sm border border-blue-100 space-y-6">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-100 pb-4">
-              <div>
-                <h2 className="text-xl font-bold text-slate-900">Faculty Class Photo Logs</h2>
-                <p className="text-xs text-slate-500">Live-verified faculty photos for each conducted class session, filtered by teacher and class.</p>
+          <div className="space-y-8">
+            
+            {/* 1. FACULTY TEACHING WORKLOAD & SUBJECT METRICS */}
+            <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 sm:p-8 shadow-sm border border-blue-100 space-y-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-100 pb-4 gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-purple-50 rounded-xl">
+                      <School className="w-5 h-5 text-purple-600" />
+                    </div>
+                    <h2 className="text-xl font-bold text-slate-900">Faculty Teaching Workload &amp; Subject Metrics</h2>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Detailed breakdown of which Madam / Sir has taken how many subjects, classes conducted, and sections taught.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1 bg-purple-50 text-purple-800 text-xs font-mono font-bold rounded-xl border border-purple-200">
+                    {facultyWorkloadStats.length} Faculty Profiles
+                  </span>
+                  <span className="px-3 py-1 bg-blue-50 text-blue-800 text-xs font-mono font-bold rounded-xl border border-blue-200">
+                    {sessions.length} Total Lectures Delivered
+                  </span>
+                </div>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <select
-                  value={photoFilter.teacher}
-                  onChange={(e) => setPhotoFilter({ ...photoFilter, teacher: e.target.value })}
-                  className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700"
-                >
-                  <option value="All">All Faculty</option>
-                  {distinctTeacherNames.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-                <select
-                  value={photoFilter.branch}
-                  onChange={(e) => setPhotoFilter({ ...photoFilter, branch: e.target.value })}
-                  className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700"
-                >
-                  <option value="All">All Branches</option>
-                  {DataService.getDepartments().map(b => <option key={b} value={b}>{b}</option>)}
-                </select>
-                <select
-                  value={photoFilter.year}
-                  onChange={(e) => setPhotoFilter({ ...photoFilter, year: e.target.value })}
-                  className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700"
-                >
-                  <option value="All">All Years</option>
-                  {DataService.getYears().map(y => <option key={y} value={y}>{y}</option>)}
-                </select>
-                <select
-                  value={photoFilter.section}
-                  onChange={(e) => setPhotoFilter({ ...photoFilter, section: e.target.value })}
-                  className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700"
-                >
-                  <option value="All">All Sections</option>
-                  {DataService.getSections().map(s => <option key={s} value={s}>Sec {s}</option>)}
-                </select>
-              </div>
-            </div>
 
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-mono font-bold bg-sky-50 text-sky-800 border border-sky-200 px-3 py-1 rounded-lg">
-                Showing: {teacherClassLogs.length} Class Sessions
-              </span>
-            </div>
+              {/* Faculty Cards Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {facultyWorkloadStats.length === 0 ? (
+                  <div className="col-span-full py-8 text-center text-slate-400 text-xs bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                    No faculty teaching logs recorded yet.
+                  </div>
+                ) : (
+                  facultyWorkloadStats.map((fac) => {
+                    const subjectEntries = Object.entries(fac.subjectsMap || {});
+                    const sectionEntries = Object.entries(fac.sectionsMap || {});
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 border-y border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                    <th className="py-3 px-3">Photo</th>
-                    <th className="py-3 px-3">Faculty Name</th>
-                    <th className="py-3 px-3">Subject / Class</th>
-                    <th className="py-3 px-3">Roster (Branch/Yr/Sec)</th>
-                    <th className="py-3 px-3">Semester</th>
-                    <th className="py-3 px-3">Session Date & Time</th>
-                    <th className="py-3 px-3">Students</th>
-                    <th className="py-3 px-3 text-center">View</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-xs">
-                  {teacherClassLogs.length === 0 ? (
-                    <tr>
-                      <td colSpan="8" className="py-10 text-center text-slate-400 text-sm">
-                        No faculty class photos found for the selected filters.
-                      </td>
-                    </tr>
-                  ) : (
-                    teacherClassLogs.map(log => (
-                      <tr key={log.id} className="hover:bg-blue-50/40 transition-colors">
-                        <td className="py-3 px-3">
-                          <img
-                            src={log.imageUrl}
-                            alt={log.teacherName}
-                            className="w-12 h-12 rounded-xl object-cover border-2 border-blue-200 cursor-pointer hover:scale-110 transition-transform shadow-sm"
-                            onClick={() => setSelectedPhoto(log)}
-                          />
-                        </td>
-                        <td className="py-3 px-3">
-                          <span className="font-bold text-slate-900">{log.teacherName}</span>
-                          <br />
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-800 font-bold">Faculty</span>
-                        </td>
-                        <td className="py-3 px-3 font-semibold text-slate-800">{log.subjectName || "—"}</td>
-                        <td className="py-3 px-3">
-                          <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded font-semibold text-[11px]">
-                            {log.branch} | {log.year} | Sec {log.section}
-                          </span>
-                        </td>
-                        <td className="py-3 px-3 text-slate-600">Sem {log.semester}</td>
-                        <td className="py-3 px-3 text-slate-500 font-mono text-[11px]">
-                          {log.createdAt ? new Date(log.createdAt).toLocaleString() : "—"}
-                        </td>
-                        <td className="py-3 px-3">
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-full text-emerald-700 font-bold">
-                            <Users className="w-3.5 h-3.5" /> {log.studentsPresent}
-                          </span>
-                        </td>
-                        <td className="py-3 px-3 text-center">
+                    return (
+                      <div
+                        key={fac.name}
+                        className="bg-gradient-to-br from-slate-50 to-blue-50/40 p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 transition-all space-y-3 flex flex-col justify-between"
+                      >
+                        <div>
+                          {/* Header: Name + Department + Total Classes Badge */}
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <h3 className="font-extrabold text-sm text-slate-900">{fac.name}</h3>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 font-bold">
+                                  {fac.department}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-500 font-mono mt-0.5">{fac.email}</p>
+                            </div>
+
+                            <div className="text-right shrink-0">
+                              <span className="inline-block px-2.5 py-1 bg-purple-600 text-white rounded-xl text-xs font-black shadow-xs">
+                                {fac.totalSessions} Classes Done
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Subjects Taught Breakdown */}
+                          <div className="mt-3 pt-3 border-t border-slate-200/80 space-y-1.5">
+                            <div className="text-[11px] font-bold text-slate-600 uppercase tracking-wider flex items-center justify-between">
+                              <span>Subjects Taught ({subjectEntries.length}):</span>
+                            </div>
+
+                            {subjectEntries.length === 0 ? (
+                              <div className="text-[11px] text-slate-400 italic">No class sessions conducted yet.</div>
+                            ) : (
+                              <div className="space-y-1">
+                                {subjectEntries.map(([subName, count]) => (
+                                  <div key={subName} className="flex items-center justify-between text-xs bg-white p-2 rounded-xl border border-slate-200">
+                                    <span className="font-semibold text-slate-800 truncate max-w-[180px]" title={subName}>
+                                      📖 {subName}
+                                    </span>
+                                    <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded text-[11px] shrink-0">
+                                      {count} {count === 1 ? "Class" : "Classes"}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Sections Covered */}
+                          {sectionEntries.length > 0 && (
+                            <div className="mt-2 space-y-1">
+                              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                Class Sections:
+                              </div>
+                              <div className="flex flex-wrap gap-1">
+                                {sectionEntries.map(([sec, count]) => (
+                                  <span key={sec} className="text-[10px] bg-slate-200/70 text-slate-700 px-2 py-0.5 rounded-lg font-semibold">
+                                    {sec} ({count})
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Footer: Total Student Attendances & Quick Filter */}
+                        <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between text-xs">
+                          <div className="text-[11px] text-slate-500 font-mono">
+                            {fac.lastClassAt ? (
+                              <span>Last: {new Date(fac.lastClassAt).toLocaleDateString([], { month: "short", day: "numeric" })}</span>
+                            ) : (
+                              <span>Inactive</span>
+                            )}
+                          </div>
+
                           <button
-                            onClick={() => setSelectedPhoto(log)}
-                            className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-[11px] font-bold transition-colors cursor-pointer"
+                            onClick={() => setPhotoFilter({ ...photoFilter, teacher: fac.name })}
+                            className="px-2.5 py-1 bg-white hover:bg-blue-600 hover:text-white text-blue-700 border border-blue-200 rounded-lg text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
                           >
-                            Details
+                            Filter Logs ↓
                           </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* 2. FACULTY CLASS PHOTO LOGS & SESSION RECORDS */}
+            <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 sm:p-8 shadow-sm border border-blue-100 space-y-6">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-100 pb-4">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900">Faculty Class Photo Logs</h2>
+                  <p className="text-xs text-slate-500">Live-verified faculty photos for each conducted class session, filtered by teacher and class.</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={photoFilter.teacher}
+                    onChange={(e) => setPhotoFilter({ ...photoFilter, teacher: e.target.value })}
+                    className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 cursor-pointer"
+                  >
+                    <option value="All">All Faculty</option>
+                    {distinctTeacherNames.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                  <select
+                    value={photoFilter.branch}
+                    onChange={(e) => setPhotoFilter({ ...photoFilter, branch: e.target.value })}
+                    className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 cursor-pointer"
+                  >
+                    <option value="All">All Branches</option>
+                    {DataService.getDepartments().map(b => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                  <select
+                    value={photoFilter.year}
+                    onChange={(e) => setPhotoFilter({ ...photoFilter, year: e.target.value })}
+                    className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 cursor-pointer"
+                  >
+                    <option value="All">All Years</option>
+                    {DataService.getYears().map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                  <select
+                    value={photoFilter.section}
+                    onChange={(e) => setPhotoFilter({ ...photoFilter, section: e.target.value })}
+                    className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 cursor-pointer"
+                  >
+                    <option value="All">All Sections</option>
+                    {DataService.getSections().map(s => <option key={s} value={s}>Sec {s}</option>)}
+                  </select>
+
+                  {photoFilter.teacher !== "All" && (
+                    <button
+                      onClick={() => setPhotoFilter({ ...photoFilter, teacher: "All" })}
+                      className="px-2.5 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold cursor-pointer"
+                    >
+                      Clear Filter
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-mono font-bold bg-sky-50 text-sky-800 border border-sky-200 px-3 py-1 rounded-lg">
+                  Showing: {teacherClassLogs.length} Class Sessions
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-y border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                      <th className="py-3 px-3">Photo</th>
+                      <th className="py-3 px-3">Faculty Name</th>
+                      <th className="py-3 px-3">Subject / Class</th>
+                      <th className="py-3 px-3">Roster (Branch/Yr/Sec)</th>
+                      <th className="py-3 px-3">Semester</th>
+                      <th className="py-3 px-3">Session Date &amp; Time</th>
+                      <th className="py-3 px-3">Students</th>
+                      <th className="py-3 px-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs">
+                    {teacherClassLogs.length === 0 ? (
+                      <tr>
+                        <td colSpan="8" className="py-10 text-center text-slate-400 text-sm">
+                          No faculty class photos found for the selected filters.
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : (
+                      teacherClassLogs.map(log => (
+                        <tr key={log.id} className="hover:bg-blue-50/40 transition-colors">
+                          <td className="py-3 px-3">
+                            <img
+                              src={log.imageUrl}
+                              alt={log.teacherName}
+                              className="w-12 h-12 rounded-xl object-cover border-2 border-blue-200 cursor-pointer hover:scale-110 transition-transform shadow-sm"
+                              onClick={() => setSelectedPhoto(log)}
+                            />
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className="font-bold text-slate-900">{log.teacherName}</span>
+                            <br />
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-800 font-bold">Faculty</span>
+                          </td>
+                          <td className="py-3 px-3 font-semibold text-slate-800">{log.subjectName || "—"}</td>
+                          <td className="py-3 px-3">
+                            <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded font-semibold text-[11px]">
+                              {log.branch} | {log.year} | Sec {log.section}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-slate-600">Sem {log.semester}</td>
+                          <td className="py-3 px-3 text-slate-500 font-mono text-[11px]">
+                            {log.createdAt ? new Date(log.createdAt).toLocaleString() : "—"}
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-full text-emerald-700 font-bold">
+                              <Users className="w-3.5 h-3.5" /> {log.studentsPresent}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-right space-x-1.5">
+                            <button
+                              onClick={() => setSelectedPhoto(log)}
+                              className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-[11px] font-bold transition-colors cursor-pointer"
+                              title="View Details"
+                            >
+                              Details
+                            </button>
+                            <button
+                              onClick={() => handleDeleteTeacherClassLog(log.id, log.subjectName, log.teacherName)}
+                              className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-[11px] font-bold transition-colors cursor-pointer inline-flex items-center"
+                              title="Delete Class Session Log"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
@@ -719,7 +940,7 @@ export const AdminDashboard = () => {
                     alt={selectedPhoto.teacherName}
                     className="w-full h-64 object-cover"
                   />
-                  <div className="p-5 space-y-3">
+                  <div className="p-5 space-y-4">
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-extrabold text-slate-900">{selectedPhoto.teacherName}</h3>
                       <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 font-bold">Faculty Verified ✓</span>
@@ -743,9 +964,20 @@ export const AdminDashboard = () => {
                         <p className="font-bold text-emerald-700">{selectedPhoto.studentsPresent} Students</p>
                       </div>
                       <div className="col-span-2 bg-slate-50 rounded-xl p-3 border border-slate-100">
-                        <p className="text-slate-400 text-[10px] uppercase font-bold mb-0.5">Session Date & Time</p>
+                        <p className="text-slate-400 text-[10px] uppercase font-bold mb-0.5">Session Date &amp; Time</p>
                         <p className="font-bold text-slate-800">{selectedPhoto.createdAt ? new Date(selectedPhoto.createdAt).toLocaleString() : "—"}</p>
                       </div>
+                    </div>
+
+                    {/* Delete Session Log Button in Modal */}
+                    <div className="pt-2 flex justify-end">
+                      <button
+                        onClick={() => handleDeleteTeacherClassLog(selectedPhoto.id, selectedPhoto.subjectName, selectedPhoto.teacherName)}
+                        className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span>Delete Class Session Log &amp; Records</span>
+                      </button>
                     </div>
                   </div>
                 </div>
