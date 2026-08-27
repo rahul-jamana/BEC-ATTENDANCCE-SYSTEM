@@ -249,11 +249,23 @@ export const AyushMasterPortal = () => {
   // Filtered Users computation for Tab 2 and Tab 3
   const filteredUsers = users.filter((u) => {
     if (userRoleFilter !== "all" && u.role !== userRoleFilter) return false;
-    if (userRoleFilter === "student" || u.role === "student") {
-      if (userBranchFilter !== "all" && u.branch !== userBranchFilter) return false;
-      if (userYearFilter !== "all" && u.year !== userYearFilter) return false;
-      if (userSectionFilter !== "all" && u.section !== userSectionFilter) return false;
+
+    // Branch / Department filter
+    if (userBranchFilter !== "all") {
+      const userBranch = u.branch || u.department;
+      if (userBranch !== userBranchFilter) return false;
     }
+
+    // Year filter (applies to students)
+    if (userYearFilter !== "all") {
+      if (u.role === "student" && u.year !== userYearFilter) return false;
+    }
+
+    // Section filter (applies to students)
+    if (userSectionFilter !== "all") {
+      if (u.role === "student" && u.section !== userSectionFilter) return false;
+    }
+
     if (userSearchQuery.trim()) {
       const q = userSearchQuery.toLowerCase().trim();
       const matchName = u.name?.toLowerCase().includes(q);
@@ -1070,56 +1082,125 @@ export const AyushMasterPortal = () => {
               </span>
             </div>
 
-            {/* Filter controls for Quick Switcher too */}
-            <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50/80 p-4 rounded-2xl border border-slate-200">
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setUserRoleFilter("all")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    userRoleFilter === "all" ? "bg-blue-600 text-white shadow-sm" : "bg-white text-slate-600 border border-slate-200"
-                  }`}
-                >
-                  🌐 All ({users.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setUserRoleFilter("admin")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    userRoleFilter === "admin" ? "bg-purple-600 text-white shadow-sm" : "bg-white text-slate-600 border border-slate-200"
-                  }`}
-                >
-                  🛡️ Admins ({users.filter(u => u.role === "admin").length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setUserRoleFilter("teacher")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    userRoleFilter === "teacher" ? "bg-sky-600 text-white shadow-sm" : "bg-white text-slate-600 border border-slate-200"
-                  }`}
-                >
-                  👨‍🏫 Teachers ({users.filter(u => u.role === "teacher").length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setUserRoleFilter("student")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    userRoleFilter === "student" ? "bg-emerald-600 text-white shadow-sm" : "bg-white text-slate-600 border border-slate-200"
-                  }`}
-                >
-                  🎓 Students ({users.filter(u => u.role === "student").length})
-                </button>
+            {/* Filter controls for Quick Switcher */}
+            <div className="space-y-3 bg-slate-50/80 p-4 rounded-2xl border border-slate-200">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setUserRoleFilter("all")}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      userRoleFilter === "all" ? "bg-blue-600 text-white shadow-sm" : "bg-white text-slate-600 border border-slate-200"
+                    }`}
+                  >
+                    🌐 All ({users.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUserRoleFilter("admin")}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      userRoleFilter === "admin" ? "bg-purple-600 text-white shadow-sm" : "bg-white text-slate-600 border border-slate-200"
+                    }`}
+                  >
+                    🛡️ Admins ({users.filter(u => u.role === "admin").length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUserRoleFilter("teacher")}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      userRoleFilter === "teacher" ? "bg-sky-600 text-white shadow-sm" : "bg-white text-slate-600 border border-slate-200"
+                    }`}
+                  >
+                    👨‍🏫 Teachers ({users.filter(u => u.role === "teacher").length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUserRoleFilter("student")}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      userRoleFilter === "student" ? "bg-emerald-600 text-white shadow-sm" : "bg-white text-slate-600 border border-slate-200"
+                    }`}
+                  >
+                    🎓 Students ({users.filter(u => u.role === "student").length})
+                  </button>
+                </div>
+
+                <div className="relative flex-1 min-w-[200px] max-w-xs">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Search name, roll, email, branch..."
+                    value={userSearchQuery}
+                    onChange={(e) => setUserSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-8 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-blue-500"
+                  />
+                  {userSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setUserSearchQuery("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
               </div>
 
-              <div className="relative flex-1 min-w-[200px] max-w-xs">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Search accounts..."
-                  value={userSearchQuery}
-                  onChange={(e) => setUserSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-blue-500"
-                />
+              {/* Sub-Filters: Branch, Year, Section */}
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200/80 text-xs">
+                <span className="font-bold text-slate-500 flex items-center gap-1">
+                  <Filter className="w-3.5 h-3.5 text-blue-600" /> Academic Filters:
+                </span>
+
+                {/* Branch / Department Filter */}
+                <select
+                  value={userBranchFilter}
+                  onChange={(e) => setUserBranchFilter(e.target.value)}
+                  className="p-1.5 bg-white border border-slate-200 rounded-lg font-semibold text-slate-700 cursor-pointer"
+                >
+                  <option value="all">All Branches / Depts</option>
+                  {DataService.getDepartments().map(b => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                </select>
+
+                {/* Year Filter */}
+                <select
+                  value={userYearFilter}
+                  onChange={(e) => setUserYearFilter(e.target.value)}
+                  className="p-1.5 bg-white border border-slate-200 rounded-lg font-semibold text-slate-700 cursor-pointer"
+                >
+                  <option value="all">All Years</option>
+                  {DataService.getYears().map(y => (
+                    <option key={y} value={y}>{y} Year</option>
+                  ))}
+                </select>
+
+                {/* Section Filter */}
+                <select
+                  value={userSectionFilter}
+                  onChange={(e) => setUserSectionFilter(e.target.value)}
+                  className="p-1.5 bg-white border border-slate-200 rounded-lg font-semibold text-slate-700 cursor-pointer"
+                >
+                  <option value="all">All Sections</option>
+                  {DataService.getSections().map(s => (
+                    <option key={s} value={s}>Sec {s}</option>
+                  ))}
+                </select>
+
+                {(userBranchFilter !== "all" || userYearFilter !== "all" || userSectionFilter !== "all" || userSearchQuery) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserBranchFilter("all");
+                      setUserYearFilter("all");
+                      setUserSectionFilter("all");
+                      setUserSearchQuery("");
+                    }}
+                    className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded-md font-bold text-[11px] cursor-pointer"
+                  >
+                    Reset Filters
+                  </button>
+                )}
               </div>
             </div>
 
