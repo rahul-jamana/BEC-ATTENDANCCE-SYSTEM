@@ -47,14 +47,20 @@ export const AdminDashboard = () => {
   const [dailyYear, setDailyYear] = useState("1st");
   const [dailySection, setDailySection] = useState("A");
   const [dailyExporting, setDailyExporting] = useState(false);
+  const [dailyStudentSearchQuery, setDailyStudentSearchQuery] = useState("");
 
   // Student 360° Attendance Explorer State
   const [explorerBranch, setExplorerBranch] = useState("CSE");
   const [explorerYear, setExplorerYear] = useState("1st");
   const [explorerSection, setExplorerSection] = useState("A");
   const [explorerStudentId, setExplorerStudentId] = useState("");
+  const [explorerSearchQuery, setExplorerSearchQuery] = useState("");
   const [explorerStudentStats, setExplorerStudentStats] = useState([]);
   const [explorerLoading, setExplorerLoading] = useState(false);
+
+  // Search Filter State for Medical & Manual Attendance Tabs
+  const [medStudentSearchQuery, setMedStudentSearchQuery] = useState("");
+  const [attStudentSearchQuery, setAttStudentSearchQuery] = useState("");
 
   // New Subject Form
   const [newSubForm, setNewSubForm] = useState({ name: "", code: "", branch: "CSE", semester: "3" });
@@ -322,6 +328,16 @@ export const AdminDashboard = () => {
     u => u.role === "student" && u.status === "approved" &&
          u.branch === explorerBranch && u.year === explorerYear && u.section === explorerSection
   );
+
+  const handleSelectExplorerStudent = (studentId) => {
+    setExplorerStudentId(studentId);
+    const stud = users.find(u => u.uid === studentId);
+    if (stud) {
+      if (stud.branch) setExplorerBranch(stud.branch);
+      if (stud.year) setExplorerYear(stud.year);
+      if (stud.section) setExplorerSection(stud.section);
+    }
+  };
 
   // Load live stats for selected student in Student 360° Explorer
   useEffect(() => {
@@ -1300,10 +1316,40 @@ export const AdminDashboard = () => {
                   </div>
                 )}
 
-                {/* Step 1: Select Student */}
+                {/* Step 1: Select Student with Instant Search Filter */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="md:col-span-2 space-y-1.5">
-                    <label className="block text-xs font-bold text-slate-800">Select Student for Medical Relief</label>
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold text-slate-800">Select Student for Medical Relief</label>
+                      <span className="text-[11px] text-slate-500 font-semibold">
+                        {approvedStudents.filter(s =>
+                          !medStudentSearchQuery ||
+                          s.name?.toLowerCase().includes(medStudentSearchQuery.toLowerCase()) ||
+                          s.rollNo?.toLowerCase().includes(medStudentSearchQuery.toLowerCase())
+                        ).length} matching
+                      </span>
+                    </div>
+
+                    <div className="relative mb-2">
+                      <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                      <input
+                        type="text"
+                        placeholder="🔍 Type Student Name or Roll Number to filter list..."
+                        value={medStudentSearchQuery}
+                        onChange={(e) => setMedStudentSearchQuery(e.target.value)}
+                        className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-rose-500 focus:bg-white focus:outline-none"
+                      />
+                      {medStudentSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setMedStudentSearchQuery("")}
+                          className="absolute right-2.5 top-2 text-xs text-slate-400 hover:text-slate-600 font-bold"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+
                     <select
                       value={medStudentId}
                       onChange={(e) => {
@@ -1314,11 +1360,17 @@ export const AdminDashboard = () => {
                       className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-rose-500 focus:outline-none cursor-pointer"
                     >
                       <option value="">-- Choose Student (Roll No / Name) --</option>
-                      {approvedStudents.map((s) => (
-                        <option key={s.uid} value={s.uid}>
-                          {s.name} ({s.rollNo}) — {s.branch} {s.year} Sec-{s.section} (Sem {s.semester || "1"})
-                        </option>
-                      ))}
+                      {approvedStudents
+                        .filter(s =>
+                          !medStudentSearchQuery ||
+                          s.name?.toLowerCase().includes(medStudentSearchQuery.toLowerCase()) ||
+                          s.rollNo?.toLowerCase().includes(medStudentSearchQuery.toLowerCase())
+                        )
+                        .map((s) => (
+                          <option key={s.uid} value={s.uid}>
+                            {s.name} ({s.rollNo}) — {s.branch} {s.year} Sec-{s.section} (Sem {s.semester || "1"})
+                          </option>
+                        ))}
                     </select>
                   </div>
 
@@ -1499,21 +1551,44 @@ export const AdminDashboard = () => {
                   </div>
                 </div>
 
-                {/* Step 2: Student List */}
+                {/* Step 2: Student List with Search */}
                 <div className="border border-slate-200 rounded-2xl overflow-hidden">
-                  <div className="bg-slate-50 px-4 py-3 flex items-center justify-between border-b border-slate-200">
+                  <div className="bg-slate-50 px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-200">
                     <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
                         checked={matchingStudents.length > 0 && attSelectedStudents.length === matchingStudents.length}
                         onChange={(e) => handleSelectAllStudents(e.target.checked)}
-                        className="w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-600"
+                        className="w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-600 cursor-pointer"
                       />
                       <span className="text-xs font-bold text-slate-700">Select All Students</span>
                     </div>
-                    <span className="text-[11px] font-mono font-bold text-slate-500">
-                      {attSelectedStudents.length} / {matchingStudents.length} selected
-                    </span>
+
+                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                      <div className="relative flex-1 sm:w-64">
+                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                        <input
+                          type="text"
+                          placeholder="Filter students by name/roll..."
+                          value={attStudentSearchQuery}
+                          onChange={(e) => setAttStudentSearchQuery(e.target.value)}
+                          className="w-full pl-8 pr-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        {attStudentSearchQuery && (
+                          <button
+                            type="button"
+                            onClick={() => setAttStudentSearchQuery("")}
+                            className="absolute right-2 top-1.5 text-xs text-slate-400 font-bold hover:text-slate-600"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+
+                      <span className="text-[11px] font-mono font-bold text-slate-500 shrink-0">
+                        {attSelectedStudents.length} / {matchingStudents.length} selected
+                      </span>
+                    </div>
                   </div>
 
                   <div className="max-h-[300px] overflow-y-auto">
@@ -1534,18 +1609,24 @@ export const AdminDashboard = () => {
                             </td>
                           </tr>
                         ) : (
-                          matchingStudents.map((s) => (
-                            <tr key={s.uid} className={`hover:bg-blue-50/40 transition-colors ${attSelectedStudents.includes(s.uid) ? "bg-blue-50/60" : ""}`}>
-                              <td className="py-2.5 px-4">
-                                <input
-                                  type="checkbox"
-                                  checked={attSelectedStudents.includes(s.uid)}
-                                  onChange={() => toggleStudent(s.uid)}
-                                  className="w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-600"
-                                />
-                              </td>
-                              <td className="py-2.5 px-4 font-mono font-bold text-blue-700">{s.rollNo}</td>
-                              <td className="py-2.5 px-4 font-bold text-slate-800">{s.name}</td>
+                          matchingStudents
+                            .filter(s =>
+                              !attStudentSearchQuery ||
+                              s.name?.toLowerCase().includes(attStudentSearchQuery.toLowerCase()) ||
+                              s.rollNo?.toLowerCase().includes(attStudentSearchQuery.toLowerCase())
+                            )
+                            .map((s) => (
+                              <tr key={s.uid} className={`hover:bg-blue-50/40 transition-colors ${attSelectedStudents.includes(s.uid) ? "bg-blue-50/60" : ""}`}>
+                                <td className="py-2.5 px-4">
+                                  <input
+                                    type="checkbox"
+                                    checked={attSelectedStudents.includes(s.uid)}
+                                    onChange={() => toggleStudent(s.uid)}
+                                    className="w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-600 cursor-pointer"
+                                  />
+                                </td>
+                                <td className="py-2.5 px-4 font-mono font-bold text-blue-700">{s.rollNo}</td>
+                                <td className="py-2.5 px-4 font-bold text-slate-800">{s.name}</td>
                               <td className="py-2.5 px-4 text-slate-600">{s.branch} — {s.year} — Sec {s.section}</td>
                             </tr>
                           ))
@@ -1821,6 +1902,37 @@ export const AdminDashboard = () => {
                     ))}
                   </div>
 
+                  {/* Daily Period-wise Student Matrix Table Header & Quick Search */}
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2">
+                    <div className="relative max-w-sm w-full">
+                      <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                      <input
+                        type="text"
+                        placeholder="🔍 Filter day table by Student Name or Roll No..."
+                        value={dailyStudentSearchQuery}
+                        onChange={(e) => setDailyStudentSearchQuery(e.target.value)}
+                        className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
+                      />
+                      {dailyStudentSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setDailyStudentSearchQuery("")}
+                          className="absolute right-2.5 top-2 text-xs text-slate-400 hover:text-slate-600 font-bold"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+
+                    <span className="text-xs text-slate-500 font-semibold">
+                      Showing {dailyMatchingStudents.filter(s =>
+                        !dailyStudentSearchQuery ||
+                        s.name?.toLowerCase().includes(dailyStudentSearchQuery.toLowerCase()) ||
+                        s.rollNo?.toLowerCase().includes(dailyStudentSearchQuery.toLowerCase())
+                      ).length} of {dailyMatchingStudents.length} student(s)
+                    </span>
+                  </div>
+
                   {/* Daily Period-wise Student Matrix Table */}
                   <div className="overflow-x-auto border border-slate-200 rounded-2xl">
                     <table className="w-full text-left border-collapse">
@@ -1847,7 +1959,13 @@ export const AdminDashboard = () => {
                             </td>
                           </tr>
                         ) : (
-                          dailyMatchingStudents.map((stud, idx) => {
+                          dailyMatchingStudents
+                            .filter(s =>
+                              !dailyStudentSearchQuery ||
+                              s.name?.toLowerCase().includes(dailyStudentSearchQuery.toLowerCase()) ||
+                              s.rollNo?.toLowerCase().includes(dailyStudentSearchQuery.toLowerCase())
+                            )
+                            .map((stud, idx) => {
                             let studentAttendedToday = 0;
 
                             return (
@@ -1938,12 +2056,81 @@ export const AdminDashboard = () => {
                     <h2 className="text-xl font-bold text-slate-900">Student 360° Attendance Explorer</h2>
                   </div>
                   <p className="text-xs text-slate-500">
-                    Filter by class and select any student to view their exact subject-by-subject numerical attendance numbers and percentage.
+                    Search any student directly or filter by class to view their exact numerical attendance numbers and subject breakdown.
                   </p>
                 </div>
                 <span className="px-3 py-1 bg-sky-50 text-sky-800 text-xs font-mono font-bold rounded-xl border border-sky-200">
                   Detailed Numerical Metrics
                 </span>
+              </div>
+
+              {/* Universal Instant Quick Search Bar */}
+              <div className="relative">
+                <div className="flex items-center gap-2 bg-gradient-to-r from-blue-50 to-indigo-50 p-3 rounded-2xl border border-blue-200 shadow-xs">
+                  <Search className="w-5 h-5 text-blue-600 shrink-0 ml-1" />
+                  <input
+                    type="text"
+                    placeholder="🔍 Instant Student Search: Type any Roll Number (e.g. 2301316029) or Name (e.g. Priyanka)..."
+                    value={explorerSearchQuery}
+                    onChange={(e) => setExplorerSearchQuery(e.target.value)}
+                    className="w-full bg-white px-3.5 py-2.5 border border-blue-200 rounded-xl text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs"
+                  />
+                  {explorerSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setExplorerSearchQuery("")}
+                      className="px-2.5 py-1 bg-slate-200 hover:bg-slate-300 rounded-lg text-xs font-bold text-slate-600 cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                {/* Instant Search Results Dropdown List */}
+                {explorerSearchQuery.trim().length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1.5 bg-white rounded-2xl shadow-2xl border border-blue-200 p-2 z-30 max-h-64 overflow-y-auto space-y-1 animate-in fade-in">
+                    {approvedStudents.filter(s =>
+                      s.name?.toLowerCase().includes(explorerSearchQuery.toLowerCase()) ||
+                      s.rollNo?.toLowerCase().includes(explorerSearchQuery.toLowerCase())
+                    ).length === 0 ? (
+                      <div className="p-4 text-center text-xs text-slate-400">
+                        No student found matching "{explorerSearchQuery}"
+                      </div>
+                    ) : (
+                      approvedStudents.filter(s =>
+                        s.name?.toLowerCase().includes(explorerSearchQuery.toLowerCase()) ||
+                        s.rollNo?.toLowerCase().includes(explorerSearchQuery.toLowerCase())
+                      ).map(stud => (
+                        <div
+                          key={stud.uid}
+                          onClick={() => {
+                            setExplorerStudentId(stud.uid);
+                            setExplorerBranch(stud.branch || "CSE");
+                            setExplorerYear(stud.year || "1st");
+                            setExplorerSection(stud.section || "A");
+                            setExplorerSearchQuery("");
+                          }}
+                          className="p-3 hover:bg-blue-50/80 rounded-xl flex items-center justify-between cursor-pointer transition-colors border border-transparent hover:border-blue-200"
+                        >
+                          <div className="flex items-center space-x-2.5">
+                            <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0">
+                              {stud.name?.[0] || "S"}
+                            </div>
+                            <div>
+                              <span className="font-extrabold text-xs text-slate-900 block">{stud.name}</span>
+                              <span className="font-mono text-[11px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
+                                {stud.rollNo}
+                              </span>
+                            </div>
+                          </div>
+                          <span className="text-[11px] text-slate-500 font-semibold bg-slate-100 px-2 py-1 rounded-lg">
+                            {stud.branch} • {stud.year} • Sec {stud.section}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Class & Student Filter Controls */}
