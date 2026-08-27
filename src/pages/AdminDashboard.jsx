@@ -480,56 +480,83 @@ export const AdminDashboard = () => {
     new Set(sessions.filter(s => s.teacherName).map(s => s.teacherName))
   );
 
-  // Helper to compute a teacher's full subject and teaching breakdown
+  // Helper to compute a teacher's full subject and teaching breakdown with robust matching
   const getTeacherStats = (teacherObj) => {
     if (!teacherObj) return null;
-    const tName = teacherObj.name?.trim().toLowerCase();
-    const tEmail = teacherObj.email?.trim().toLowerCase();
+    const tUid = (teacherObj.uid || teacherObj.id || "").trim();
+    const tName = (teacherObj.name || "").trim().toLowerCase();
+    const tEmail = (teacherObj.email || "").trim().toLowerCase();
+    const tDept = (teacherObj.department || "").trim().toLowerCase();
+    const cleanTName = tName.replace(/[^a-z0-9]/g, "");
 
     // Find all sessions conducted by this teacher
     const teacherSessions = sessions.filter(s => {
-      const sName = s.teacherName?.trim().toLowerCase();
-      const sEmail = s.teacherEmail?.trim().toLowerCase();
-      return (sName && sName === tName) || (sEmail && sEmail === tEmail);
+      const sTeacherId = (s.teacherId || "").trim();
+      const sName = (s.teacherName || "").trim().toLowerCase();
+      const sEmail = (s.teacherEmail || "").trim().toLowerCase();
+      const cleanSName = sName.replace(/[^a-z0-9]/g, "");
+
+      // Match by exact UID
+      if (tUid && sTeacherId && (sTeacherId === tUid || s.uid === tUid)) return true;
+
+      // Match by Email
+      if (tEmail && sEmail && sEmail === tEmail) return true;
+
+      // Match by exact Name
+      if (tName && sName && (sName === tName || cleanSName === cleanTName)) return true;
+
+      // Match by partial name
+      if (cleanTName.length >= 3 && cleanSName.length >= 3) {
+        if (cleanSName.includes(cleanTName) || cleanTName.includes(cleanSName)) return true;
+      }
+
+      return false;
     }).sort((a, b) => new Date(b.createdAt || b.startedAt || 0) - new Date(a.createdAt || a.startedAt || 0));
 
-    // Subject and section breakdown
-    const subjectStatsMap = {};
-    const sectionStatsMap = {};
+    // Group by Subject + Branch + Year + Section + Semester
+    const subjectClassMatrix = {};
     let totalStudentsScanned = 0;
 
     teacherSessions.forEach(sess => {
       const sub = sess.subjectName || "Subject";
-      const secKey = `${sess.branch} ${sess.year} Sec-${sess.section}`;
+      const branch = sess.branch || teacherObj.department || "General";
+      const year = sess.year || "1st";
+      const section = sess.section || "A";
+      const semester = sess.semester || "1";
+      const key = `${sub}__${branch}__${year}__${section}__${semester}`;
+
       const presentCount = attendance.filter(a => a.sessionId === sess.id).length;
       totalStudentsScanned += presentCount;
 
-      if (!subjectStatsMap[sub]) {
-        subjectStatsMap[sub] = {
+      if (!subjectClassMatrix[key]) {
+        subjectClassMatrix[key] = {
+          key,
           subjectName: sub,
-          classesDone: 0,
-          sections: new Set(),
-          totalStudents: 0
+          branch,
+          year,
+          section,
+          semester,
+          totalClasses: 0,
+          totalStudentsPresent: 0,
+          sessions: []
         };
       }
-      subjectStatsMap[sub].classesDone += 1;
-      subjectStatsMap[sub].sections.add(`${sess.branch} ${sess.year} Sec-${sess.section}`);
-      subjectStatsMap[sub].totalStudents += presentCount;
 
-      sectionStatsMap[secKey] = (sectionStatsMap[secKey] || 0) + 1;
+      subjectClassMatrix[key].totalClasses += 1;
+      subjectClassMatrix[key].totalStudentsPresent += presentCount;
+      subjectClassMatrix[key].sessions.push(sess);
     });
 
-    const subjectsList = Object.values(subjectStatsMap).map(s => ({
-      ...s,
-      sections: Array.from(s.sections)
-    }));
+    const breakdownList = Object.values(subjectClassMatrix).sort((a, b) => b.totalClasses - a.totalClasses);
+    const uniqueSubjectsList = Array.from(new Set(teacherSessions.map(s => s.subjectName || "Subject")));
 
     return {
       teacher: teacherObj,
       totalClasses: teacherSessions.length,
+      uniqueSubjectsCount: uniqueSubjectsList.length,
+      uniqueSubjectsList,
       totalStudentsScanned,
-      subjectsList,
-      sectionStatsMap,
+      breakdownList,
       sessionsList: teacherSessions
     };
   };
@@ -1131,20 +1158,15 @@ export const AdminDashboard = () => {
                                 <span className="font-mono text-blue-700 font-bold">{u.rollNo}</span> • <span className="font-semibold text-slate-900">{u.branch}</span> ({u.year} Yr Sec-{u.section} Sem {u.semester || "1"})
                               </div>
                             ) : u.role === "teacher" ? (() => {
-                              const tName = u.name?.trim().toLowerCase();
-                              const tEmail = u.email?.trim().toLowerCase();
-                              const teacherSessions = sessions.filter(s => {
-                                const sName = s.teacherName?.trim().toLowerCase();
-                                const sEmail = s.teacherEmail?.trim().toLowerCase();
-                                return (sName && sName === tName) || (sEmail && sEmail === tEmail);
-                              });
-                              const subCount = new Set(teacherSessions.map(s => s.subjectName || "Subject")).size;
+                              const tStats = getTeacherStats(u);
+                              const totalClasses = tStats?.totalClasses || 0;
+                              const subCount = tStats?.uniqueSubjectsCount || 0;
                               return (
                                 <div>
                                   <div className="font-semibold text-slate-900">{u.department} Dept • {u.subjectName || "Core Faculty"}</div>
                                   <div className="text-[11px] text-blue-700 font-bold mt-0.5 flex items-center gap-1">
-                                    <span>⚡ {teacherSessions.length} {teacherSessions.length === 1 ? "Class Done" : "Classes Done"}</span>
-                                    {teacherSessions.length > 0 && (
+                                    <span>⚡ {totalClasses} {totalClasses === 1 ? "Class Done" : "Classes Done"}</span>
+                                    {totalClasses > 0 && (
                                       <span>• {subCount} {subCount === 1 ? "Subject" : "Subjects"}</span>
                                     )}
                                   </div>
@@ -1239,49 +1261,75 @@ export const AdminDashboard = () => {
                           </div>
                         </div>
 
-                        {/* 1. Subjects Breakdown */}
+                        {/* 1. Subjects & Academic Breakdown Table */}
                         <div className="space-y-3">
-                          <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                            <BookOpen className="w-4 h-4 text-blue-600" />
-                            <span>Subjects &amp; Classes Conducted:</span>
-                          </h4>
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                              <BookOpen className="w-4 h-4 text-blue-600" />
+                              <span>Academic Subject &amp; Class Section Breakdown:</span>
+                            </h4>
+                            <span className="text-[11px] font-mono font-bold text-blue-800 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">
+                              {stats.breakdownList.length} Active Teaching Groups
+                            </span>
+                          </div>
 
-                          {stats.subjectsList.length === 0 ? (
-                            <div className="p-6 bg-slate-50 border border-dashed border-slate-200 rounded-2xl text-center text-slate-400">
-                              No classes conducted yet by this faculty member.
+                          {stats.breakdownList.length === 0 ? (
+                            <div className="p-8 bg-slate-50 border border-dashed border-slate-200 rounded-2xl text-center text-slate-400">
+                              No class sessions recorded yet for this faculty member.
                             </div>
                           ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              {stats.subjectsList.map(sub => (
-                                <div key={sub.subjectName} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2 flex flex-col justify-between">
-                                  <div>
-                                    <div className="flex items-start justify-between gap-2">
-                                      <span className="font-extrabold text-slate-900 text-sm">📖 {sub.subjectName}</span>
-                                      <span className="px-2.5 py-1 bg-purple-600 text-white font-mono font-bold rounded-lg text-xs shrink-0">
-                                        {sub.classesDone} {sub.classesDone === 1 ? "Class" : "Classes"}
-                                      </span>
-                                    </div>
-                                    
-                                    <div className="mt-2 space-y-1">
-                                      <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Class Sections:</span>
-                                      <div className="flex flex-wrap gap-1">
-                                        {sub.sections.map(sec => (
-                                          <span key={sec} className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded font-semibold text-[10px]">
-                                            {sec}
+                            <div className="overflow-x-auto border border-slate-200 rounded-2xl">
+                              <table className="w-full text-left border-collapse">
+                                <thead>
+                                  <tr className="bg-blue-50/70 border-b border-blue-100 text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                                    <th className="py-3 px-3.5">#</th>
+                                    <th className="py-3 px-3.5">Subject Taught</th>
+                                    <th className="py-3 px-3.5">Branch / Dept</th>
+                                    <th className="py-3 px-3.5">Year &amp; Semester</th>
+                                    <th className="py-3 px-3.5 text-center">Section</th>
+                                    <th className="py-3 px-3.5 text-center">Total Classes</th>
+                                    <th className="py-3 px-3.5 text-center">Students Present</th>
+                                    <th className="py-3 px-3.5 text-center">Avg / Class</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 text-xs">
+                                  {stats.breakdownList.map((item, idx) => {
+                                    const avgPerClass = item.totalClasses > 0 ? Math.round(item.totalStudentsPresent / item.totalClasses) : 0;
+                                    return (
+                                      <tr key={item.key} className="hover:bg-blue-50/40 transition-colors">
+                                        <td className="py-3 px-3.5 font-bold text-slate-400">{idx + 1}</td>
+                                        <td className="py-3 px-3.5">
+                                          <span className="font-extrabold text-slate-900 block text-xs">📖 {item.subjectName}</span>
+                                        </td>
+                                        <td className="py-3 px-3.5">
+                                          <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-md font-bold text-[11px]">
+                                            {item.branch}
                                           </span>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-500">
-                                    <span>👥 {sub.totalStudents} Student Scans</span>
-                                    <span className="font-bold text-blue-700">
-                                      {stats.totalClasses > 0 ? Math.round((sub.classesDone / stats.totalClasses) * 100) : 0}% of workload
-                                    </span>
-                                  </div>
-                                </div>
-                              ))}
+                                        </td>
+                                        <td className="py-3 px-3.5 font-semibold text-slate-700">
+                                          {item.year} Year (Sem {item.semester})
+                                        </td>
+                                        <td className="py-3 px-3.5 text-center">
+                                          <span className="px-2 py-0.5 bg-slate-100 text-slate-800 rounded font-bold text-[11px]">
+                                            Sec {item.section}
+                                          </span>
+                                        </td>
+                                        <td className="py-3 px-3.5 text-center">
+                                          <span className="px-2.5 py-1 bg-purple-600 text-white font-mono font-bold rounded-lg text-xs">
+                                            {item.totalClasses} {item.totalClasses === 1 ? "Class" : "Classes"}
+                                          </span>
+                                        </td>
+                                        <td className="py-3 px-3.5 text-center font-bold text-emerald-700">
+                                          👥 {item.totalStudentsPresent}
+                                        </td>
+                                        <td className="py-3 px-3.5 text-center font-mono font-semibold text-slate-600">
+                                          ~{avgPerClass}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
                             </div>
                           )}
                         </div>
