@@ -1275,8 +1275,23 @@ export const AdminDashboard = () => {
                           </div>
 
                           {stats.breakdownList.length === 0 ? (
-                            <div className="p-8 bg-slate-50 border border-dashed border-slate-200 rounded-2xl text-center text-slate-400">
-                              No class sessions recorded yet for this faculty member.
+                            <div className="p-6 bg-gradient-to-br from-slate-50 to-blue-50/50 border border-blue-200/80 rounded-2xl space-y-3">
+                              <div className="flex items-start gap-3">
+                                <div className="p-2.5 bg-blue-100 text-blue-800 rounded-xl font-bold">
+                                  <BookOpen className="w-5 h-5" />
+                                </div>
+                                <div className="space-y-1">
+                                  <h5 className="font-extrabold text-slate-900 text-sm">
+                                    Assigned Subject: <span className="text-blue-700">{stats.teacher.subjectName || "Core Faculty"}</span>
+                                  </h5>
+                                  <p className="text-slate-600 text-xs leading-relaxed">
+                                    This teacher is registered in the <strong>{stats.teacher.department || "General"} Department</strong> to teach <strong>{stats.teacher.subjectName || "Departmental Subjects"}</strong>.
+                                  </p>
+                                  <p className="text-slate-500 text-[11px]">
+                                    No live classroom sessions have been launched under this account yet. When this teacher starts a class from the Teacher Portal, each lecture's subject, branch, year, section, and student count will automatically appear in this table in real-time.
+                                  </p>
+                                </div>
+                              </div>
                             </div>
                           ) : (
                             <div className="overflow-x-auto border border-slate-200 rounded-2xl">
