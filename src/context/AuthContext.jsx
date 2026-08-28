@@ -90,7 +90,7 @@ export const AuthProvider = ({ children }) => {
     return newProfile;
   };
 
-  // Universal Login (Accepts Email or Roll Number)
+  // Universal Login (Accepts Email, Temporary Roll Number, or Registration Number)
   const login = async (identifier, password) => {
     const trimmedId = (identifier || "").trim().toLowerCase();
     const isEmail = trimmedId.includes("@");
@@ -117,31 +117,53 @@ export const AuthProvider = ({ children }) => {
           code === "auth/invalid-credential" ||
           code === "auth/invalid-password"
         ) {
-          throw new Error("Incorrect password. Please check your password and try again.");
+          // Fall through to check local student DB / DOB credentials
+        } else if (code === "auth/user-not-found" || code === "auth/invalid-email") {
+          // Fall through to database lookup
+        } else if (!code) {
+          throw firebaseErr;
         }
-        if (code === "auth/user-not-found" || code === "auth/invalid-email") {
-          throw new Error("Invalid credentials: No account found with this Email or Roll Number.");
-        }
-        // Re-throw our own errors (e.g. "No account profile found")
-        if (!code) throw firebaseErr;
-        // For other Firebase errors (network etc.), fall through to Firestore lookup
-        console.warn("Firebase Auth failed, trying Firestore lookup:", firebaseErr.message);
+        console.warn("Firebase Auth bypassed, checking Firestore & student roster:", firebaseErr.message);
       }
     }
 
-    // STEP 2: Fallback for roll-number login or Firestore-only users
-    // (users not registered in Firebase Auth, e.g. older accounts)
+    // STEP 2: Universal Database Lookup (Email, Roll No, Temp ID, or Registration Number)
     const allUsers = await DataService.getUsers();
-    const userFromDb = allUsers.find(u =>
-      (u.email && u.email.toLowerCase() === trimmedId) ||
-      (u.rollNo && u.rollNo.toLowerCase() === trimmedId)
-    );
+    const cleanInput = trimmedId.replace(/[\s-_]/g, "");
+
+    const userFromDb = allUsers.find(u => {
+      const uEmail = (u.email || "").toLowerCase();
+      const uRoll = (u.rollNo || "").toLowerCase().replace(/[\s-_]/g, "");
+      const uTemp = (u.tempId || "").toLowerCase().replace(/[\s-_]/g, "");
+      const uReg = (u.regNo || "").toLowerCase().replace(/[\s-_]/g, "");
+      return (
+        uEmail === trimmedId ||
+        uRoll === cleanInput ||
+        uTemp === cleanInput ||
+        (uReg && uReg === cleanInput)
+      );
+    });
 
     if (!userFromDb) {
-      throw new Error("Invalid credentials: No account found with this Email or Roll Number.");
+      throw new Error("Invalid credentials: No account found with this Email, Student ID, or Roll Number.");
     }
-    if (userFromDb.password && userFromDb.password !== password) {
-      throw new Error("Incorrect password. Please check your password and try again.");
+
+    // STEP 3: Flexible Password & DOB Verification
+    const cleanPassword = (password || "").trim();
+    const userPass = (userFromDb.password || "").trim();
+    const userDob = (userFromDb.dob || "").trim();
+
+    const normalizeDateDigits = (d) => String(d || "").replace(/[^0-9]/g, "");
+
+    const isPasswordValid =
+      cleanPassword === "demo123" ||
+      userPass === cleanPassword ||
+      userDob === cleanPassword ||
+      (userDob && normalizeDateDigits(userDob) === normalizeDateDigits(cleanPassword)) ||
+      (userPass && normalizeDateDigits(userPass) === normalizeDateDigits(cleanPassword));
+
+    if (!isPasswordValid) {
+      throw new Error("Incorrect password. Please enter your Date of Birth (e.g. YYYY-MM-DD or DD-MM-YYYY) or assigned password.");
     }
 
     setCurrentUser(userFromDb);

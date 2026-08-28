@@ -21,7 +21,13 @@ export const StudentDashboard = () => {
 
   // Edit Profile Modal State
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
-  const [profileForm, setProfileForm] = useState({ name: "", dob: "", gender: "Male", phone: "" });
+  const [profileForm, setProfileForm] = useState({ 
+    name: "", 
+    dob: "", 
+    gender: "Male", 
+    phone: "",
+    regNo: "" 
+  });
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileSuccessMsg, setProfileSuccessMsg] = useState("");
 
@@ -34,7 +40,7 @@ export const StudentDashboard = () => {
 
       const allAttendance = await DataService.getAttendance();
       const studentLogs = allAttendance
-        .filter(a => a.studentId === userProfile.uid || a.rollNo === userProfile.rollNo)
+        .filter(a => a.studentId === userProfile.uid || a.rollNo === userProfile.rollNo || (a.tempId && a.tempId === userProfile.tempId))
         .sort((a, b) => new Date(b.markedAt) - new Date(a.markedAt));
       setAttendanceLogs(studentLogs);
     } catch (e) {
@@ -53,7 +59,8 @@ export const StudentDashboard = () => {
       name: userProfile?.name || "",
       dob: userProfile?.dob || "",
       gender: userProfile?.gender || "Male",
-      phone: userProfile?.phone || ""
+      phone: userProfile?.phone || "",
+      regNo: userProfile?.regNo || ""
     });
     setProfileSuccessMsg("");
     setIsEditProfileOpen(true);
@@ -143,12 +150,23 @@ export const StudentDashboard = () => {
                 Hi, {userProfile?.name?.split(" ")[0]} 👋
               </h1>
               
-              <p className="text-blue-100 text-sm font-medium">
-                {userProfile?.branch} Engineering • {userProfile?.year} Year • Section {userProfile?.section} (Sem {userProfile?.semester}) • Roll: <span className="font-mono text-white font-bold bg-white/15 px-2 py-0.5 rounded-md">{userProfile?.rollNo}</span>
-              </p>
+              <div className="text-blue-100 text-sm font-medium flex items-center gap-2 flex-wrap">
+                <span>{userProfile?.branch} Engineering • {userProfile?.year} Year • Section {userProfile?.section} (Sem {userProfile?.semester})</span>
+                <span className="text-white font-mono font-bold bg-white/20 px-2.5 py-0.5 rounded-md border border-white/20">
+                  {userProfile?.regNo ? `Reg No: ${userProfile.regNo}` : `Temp ID: ${userProfile?.rollNo || userProfile?.tempId}`}
+                </span>
+                {!userProfile?.regNo && (
+                  <button
+                    onClick={handleOpenEditProfile}
+                    className="text-[11px] bg-amber-400 hover:bg-amber-300 text-amber-950 px-2 py-0.5 rounded-md font-bold transition-transform hover:scale-105 cursor-pointer"
+                  >
+                    + Add BPUT Reg No
+                  </button>
+                )}
+              </div>
               {userProfile?.dob && (
                 <p className="text-blue-200 text-xs">
-                  DOB: {new Date(userProfile.dob).toLocaleDateString("en-IN")} • Gender: {userProfile.gender || "Not specified"}
+                  DOB: {new Date(userProfile.dob).toLocaleDateString("en-IN")} • Email: {userProfile?.email}
                 </p>
               )}
             </div>
@@ -823,21 +841,31 @@ export const StudentDashboard = () => {
                 </div>
               </div>
 
-              {/* Contact Phone */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Contact Phone</label>
+              {/* BPUT Official Registration Number Input */}
+              <div className="bg-amber-50/70 p-3 rounded-2xl border border-amber-200 space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-black text-amber-950 uppercase">
+                    BPUT / University Registration Number
+                  </label>
+                  <span className="text-[10px] font-bold text-amber-700 bg-amber-200/60 px-2 py-0.5 rounded">
+                    Permanent ID
+                  </span>
+                </div>
                 <input
-                  type="tel"
-                  placeholder="9876543210"
-                  value={profileForm.phone}
-                  onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  type="text"
+                  placeholder="e.g. 2401297001"
+                  value={profileForm.regNo}
+                  onChange={(e) => setProfileForm({ ...profileForm, regNo: e.target.value.toUpperCase() })}
+                  className="w-full p-2.5 bg-white border border-amber-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:ring-2 focus:ring-amber-500 focus:outline-none uppercase"
                 />
+                <p className="text-[10px] text-amber-800">
+                  Update this once college issues your permanent registration number. You can log in using it.
+                </p>
               </div>
 
               {/* Read-Only Academic Info */}
               <div className="p-3 bg-blue-50/60 rounded-xl text-[11px] text-blue-900 border border-blue-100 font-mono space-y-0.5">
-                <div>Roll No: {userProfile?.rollNo} (Institutional ID)</div>
+                <div>Institutional Temp ID: {userProfile?.tempId || userProfile?.rollNo}</div>
                 <div>Roster: {userProfile?.branch} • {userProfile?.year} Year • Sec {userProfile?.section}</div>
               </div>
 

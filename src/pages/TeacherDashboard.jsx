@@ -3,11 +3,12 @@ import { useAuth } from "../context/AuthContext";
 import { DataService } from "../services/dataService";
 import { ProjectorQRModal } from "../components/ProjectorQRModal";
 import { TeacherPhotoModal } from "../components/TeacherPhotoModal";
+import { TeacherManualAttendanceModal } from "../components/TeacherManualAttendanceModal";
 import { exportAttendancePDF, exportAttendanceExcel, exportTeacherSessionExcel } from "../utils/pdfExporter";
 import { 
   QrCode, School, Play, StopCircle, FileText, Download, Users, 
   Sparkles, CheckCircle2, Clock, Filter, BookOpen, Layers, Camera,
-  Trash2, Edit3, Save, X, UserCog, Calendar
+  Trash2, Edit3, Save, X, UserCog, Calendar, UserCheck
 } from "lucide-react";
 
 export const TeacherDashboard = () => {
@@ -18,6 +19,8 @@ export const TeacherDashboard = () => {
   const [activeSession, setActiveSession] = useState(null);
   const [isProjectorOpen, setIsProjectorOpen] = useState(false);
   const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
+  const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+  const [manualSessionTarget, setManualSessionTarget] = useState(null);
   const [pendingSessionData, setPendingSessionData] = useState(null);
 
   // Subject-wise and Date-wise filter state
@@ -274,7 +277,19 @@ export const TeacherDashboard = () => {
               </div>
             </div>
 
-            <div className="flex items-center gap-3 w-full md:w-auto">
+            <div className="flex items-center gap-2.5 w-full md:w-auto flex-wrap">
+              <button
+                onClick={() => {
+                  setManualSessionTarget(activeSession);
+                  setIsManualModalOpen(true);
+                }}
+                className="flex-1 md:flex-none px-3.5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-md transition-all flex items-center justify-center space-x-1.5 cursor-pointer border border-blue-400"
+                title="Manually mark attendance if student QR scanner fails"
+              >
+                <UserCheck className="w-4 h-4" />
+                <span>Manual Attendance</span>
+              </button>
+
               <button
                 onClick={() => setIsProjectorOpen(true)}
                 className="flex-1 md:flex-none px-4 py-2.5 bg-white text-emerald-800 hover:bg-emerald-50 font-bold rounded-xl text-xs shadow-md transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
@@ -503,6 +518,18 @@ export const TeacherDashboard = () => {
                           </span>
                         </td>
                         <td className="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
+                          {/* Manual Attendance Fallback */}
+                          <button
+                            onClick={() => {
+                              setManualSessionTarget(sess);
+                              setIsManualModalOpen(true);
+                            }}
+                            className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-[11px] font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                            title="Manually mark attendance for this session"
+                          >
+                            <UserCheck className="w-3 h-3" /> Manual
+                          </button>
+
                           {/* Export PDF */}
                           <button
                             onClick={() => handleExportSessionPDF(sess)}
@@ -540,6 +567,17 @@ export const TeacherDashboard = () => {
         </div>
 
       </div>
+
+      {/* Teacher Manual Attendance Modal */}
+      <TeacherManualAttendanceModal
+        isOpen={isManualModalOpen}
+        onClose={() => {
+          setIsManualModalOpen(false);
+          setManualSessionTarget(null);
+        }}
+        session={manualSessionTarget}
+        onAttendanceUpdated={loadTeacherData}
+      />
 
       {/* Teacher Live Photo Verification Modal */}
       <TeacherPhotoModal

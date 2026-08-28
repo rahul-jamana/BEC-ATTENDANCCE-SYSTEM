@@ -3,6 +3,8 @@ import {
   collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc
 } from "firebase/firestore";
 
+import { FIRST_YEAR_STUDENTS } from "../data/students1stYear";
+
 // Initial Seed Data for Instant Local Development & Testing
 // BPUT (Biju Patnaik University of Technology) Branches
 const DEFAULT_DEPARTMENTS = [
@@ -10,7 +12,7 @@ const DEFAULT_DEPARTMENTS = [
   "Agriculture", "Biotechnology", "Chemical", "Mining", "Automobile", "EIE"
 ];
 const DEFAULT_YEARS = ["1st", "2nd", "3rd", "4th"];
-const DEFAULT_SECTIONS = ["A", "B", "C", "D"];
+const DEFAULT_SECTIONS = ["A", "B", "C", "D", "A+B Combine"];
 const DEFAULT_SEMESTERS = ["1", "2", "3", "4", "5", "6", "7", "8"];
 
 // ──────────────────────────────────────────────────────────────
@@ -689,10 +691,11 @@ const DEFAULT_USERS = [
 export const DataService = {
   // --- USERS ---
   async getUsers() {
+    let remoteUsers = [];
     if (isLiveFirebaseConfigured && db) {
       try {
         const snap = await getDocs(collection(db, "users"));
-        return snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+        remoteUsers = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
       } catch (e) {
         console.warn("Firestore SDK getUsers failed, trying REST:", e.message);
         try {
@@ -701,7 +704,7 @@ export const DataService = {
           if (res.ok) {
             const data = await res.json();
             if (data.documents) {
-              return data.documents.map(d => {
+              remoteUsers = data.documents.map(d => {
                 const fields = d.fields || {};
                 const result = { uid: d.name.split("/").pop() };
                 for (const [key, val] of Object.entries(fields)) {
@@ -716,15 +719,44 @@ export const DataService = {
         }
       }
     }
-    throw new Error("Firebase is not configured. Cannot load users.");
+
+    // Merge baseline seeds + 183 1st Year Students + remote updates
+    const userMap = new Map();
+    [...DEFAULT_USERS, ...FIRST_YEAR_STUDENTS].forEach(u => {
+      userMap.set(u.uid, u);
+      if (u.email) userMap.set(u.email.toLowerCase(), u);
+    });
+
+    remoteUsers.forEach(u => {
+      const existing = userMap.get(u.uid) || (u.email ? userMap.get(u.email.toLowerCase()) : null) || {};
+      const merged = { ...existing, ...u };
+      userMap.set(u.uid, merged);
+      if (u.email) userMap.set(u.email.toLowerCase(), merged);
+    });
+
+    const uniqueUsers = Array.from(new Set(Array.from(userMap.values())));
+    return uniqueUsers;
   },
 
   async getUserById(uid) {
     if (isLiveFirebaseConfigured && db) {
-      const snap = await getDoc(doc(db, "users", uid));
-      return snap.exists() ? { uid: snap.id, ...snap.data() } : null;
+      try {
+        const snap = await getDoc(doc(db, "users", uid));
+        if (snap.exists()) return { uid: snap.id, ...snap.data() };
+      } catch (e) {
+        console.warn("Firestore getUserById failed, falling back to local merge:", e.message);
+      }
     }
-    throw new Error("Firebase is not configured.");
+    const all = await this.getUsers();
+    return all.find(u => u.uid === uid) || null;
+  },
+
+  async updateUserRegistrationNumber(uid, regNo) {
+    const cleanReg = String(regNo || "").trim().toUpperCase();
+    if (isLiveFirebaseConfigured && db) {
+      await setDoc(doc(db, "users", uid), { regNo: cleanReg, updatedAt: new Date().toISOString() }, { merge: true });
+    }
+    return true;
   },
 
   async createUser(userData) {
@@ -852,12 +884,12 @@ export const DataService = {
     throw new Error("Firebase is not configured. Cannot load attendance.");
   },
 
-  async markAttendance({ student, session, token, livePhoto }) {
+  async markAttendance({ student, session, token, livePhoto, isManual = false, markedBy = null }) {
     if (!isLiveFirebaseConfigured || !db) {
       throw new Error("Firebase is not configured. Cannot mark attendance.");
     }
 
-    const normalizeStr = (v) => String(v || "").trim().toLowerCase().replace(/[\s-_]/g, "");
+    const normalizeStr = (v) => String(v || "").trim().toLowerCase().replace(/[\s-_+]/g, "");
 
     const studentBranch = normalizeStr(student?.branch);
     const sessionBranch = normalizeStr(session?.branch);
@@ -866,17 +898,43 @@ export const DataService = {
     const studentSection = normalizeStr(student?.section);
     const sessionSection = normalizeStr(session?.section);
 
-    if (
-      (studentBranch && sessionBranch && studentBranch !== sessionBranch) ||
-      (studentYear && sessionYear && studentYear !== sessionYear) ||
-      (studentSection && sessionSection && studentSection !== sessionSection)
-    ) {
+    const isCombinedSession = 
+      sessionSection.includes("ab") || 
+      sessionSection.includes("combine") || 
+      session?.isCombined ||
+      (Array.isArray(session?.combinedSections) && session.combinedSections.some(s => normalizeStr(s) === studentSection));
+
+    // Year check
+    if (studentYear && sessionYear && studentYear !== sessionYear) {
       throw new Error(
-        `This class is for ${session.branch} ${session.year} Sec ${session.section}! (Your roster is registered as ${student.branch || "Unknown"} ${student.year || ""} Sec ${student.section || ""})`
+        `This class is for ${session.year} Year students! (Your roster is registered as ${student.year || "Unknown"} Year)`
       );
     }
-    if (!session.isActive) throw new Error("This class session has ended.");
-    if (session.token !== token) throw new Error("QR Expired or Invalid token!");
+
+    // Section & Branch verification
+    if (isCombinedSession) {
+      // Default A+B combine allows Section A (CSE) and Section B (Data Science)
+      const allowedSections = session?.combinedSections?.map(normalizeStr) || ["a", "b"];
+      if (!allowedSections.includes(studentSection) && studentSection) {
+        throw new Error(
+          `This combined session is for Sections ${allowedSections.map(s => s.toUpperCase()).join(" & ")}! (Your section is ${student.section || "Unknown"})`
+        );
+      }
+    } else {
+      if (studentSection && sessionSection && studentSection !== sessionSection) {
+        throw new Error(
+          `This class is for Section ${session.section}! (Your roster is registered as Section ${student.section || "Unknown"})`
+        );
+      }
+      if (studentBranch && sessionBranch && studentBranch !== sessionBranch && session.year !== "1st") {
+        throw new Error(
+          `This class is for ${session.branch}! (Your roster is registered as ${student.branch || "Unknown"})`
+        );
+      }
+    }
+
+    if (!session.isActive && !isManual) throw new Error("This class session has ended.");
+    if (!isManual && session.token !== token) throw new Error("QR Expired or Invalid token!");
 
     const attendanceRecords = await this.getAttendance();
     const docId = `${session.id}_${student.uid}`;
@@ -890,7 +948,9 @@ export const DataService = {
       sessionId: session.id,
       studentId: student.uid,
       studentName: student.name,
-      rollNo: student.rollNo,
+      rollNo: student.rollNo || student.tempId || "",
+      tempId: student.tempId || student.rollNo || "",
+      regNo: student.regNo || "",
       branch: student.branch,
       year: student.year,
       section: student.section,
@@ -900,11 +960,29 @@ export const DataService = {
       markedAt: new Date().toISOString(),
       status: "present",
       livePhoto: livePhoto || null,
-      photoVerified: !!livePhoto
+      photoVerified: !!livePhoto,
+      isManual: !!isManual,
+      markedByFaculty: isManual ? (markedBy || session.teacherName || "Faculty") : null
     };
 
     await setDoc(doc(db, "attendance", docId), newRecord);
     return newRecord;
+  },
+
+  // --- TEACHER MANUAL ATTENDANCE (Fallback when QR code fails) ---
+  async teacherManualMarkAttendance({ session, student, teacherName, reason = "Manual Attendance (QR Fallback)" }) {
+    if (!isLiveFirebaseConfigured || !db) {
+      throw new Error("Firebase is not configured. Cannot record attendance.");
+    }
+
+    return this.markAttendance({
+      student,
+      session,
+      token: session?.token || "manual_faculty",
+      livePhoto: null,
+      isManual: true,
+      markedBy: teacherName || session?.teacherName || "Faculty"
+    });
   },
 
   // --- ATTENDANCE STATS CALCULATION ---
@@ -912,6 +990,8 @@ export const DataService = {
     const allSessions = await this.getSessions();
     const allAttendance = await this.getAttendance();
     const allSubjects = await this.getSubjects();
+
+    const normalizeStr = (v) => String(v || "").trim().toLowerCase().replace(/[\s-_+]/g, "");
 
     const bputList = this.getBputSubjectsForBranch(student?.branch, student?.semester) || [];
     const subjectsMap = new Map();
@@ -921,9 +1001,22 @@ export const DataService = {
       subjectsMap.set(key, { id: b.code || b.name, name: b.name, code: b.code });
     });
 
-    const classSessions = allSessions.filter(
-      sess => sess.branch === student?.branch && sess.year === student?.year && sess.section === student?.section
-    );
+    const studSec = normalizeStr(student?.section);
+    const studYear = normalizeStr(student?.year);
+    const studBranch = normalizeStr(student?.branch);
+
+    const classSessions = allSessions.filter(sess => {
+      const sessSec = normalizeStr(sess.section);
+      const isComb = sessSec.includes("ab") || sessSec.includes("combine") || sess.isCombined ||
+        (Array.isArray(sess.combinedSections) && sess.combinedSections.some(s => normalizeStr(s) === studSec));
+
+      const secMatch = isComb || sessSec === studSec;
+      const yearMatch = normalizeStr(sess.year) === studYear;
+      const branchMatch = (sess.year === "1st" && isComb) || normalizeStr(sess.branch) === studBranch;
+
+      return yearMatch && secMatch && branchMatch;
+    });
+
     classSessions.forEach(sess => {
       const key = sess.subjectId || sess.subjectName;
       if (!subjectsMap.has(key)) {
@@ -942,17 +1035,13 @@ export const DataService = {
     });
 
     const stats = Array.from(subjectsMap.values()).map(sub => {
-      const totalClasses = allSessions.filter(
-        sess =>
-          sess.branch === student?.branch &&
-          sess.year === student?.year &&
-          sess.section === student?.section &&
-          (sess.subjectId === sub.id || sess.subjectName === sub.name || sess.subjectId === sub.code)
+      const totalClasses = classSessions.filter(
+        sess => sess.subjectId === sub.id || sess.subjectName === sub.name || sess.subjectId === sub.code
       ).length;
 
       const attendedClasses = allAttendance.filter(
         att =>
-          (att.studentId === student?.uid || (att.rollNo && att.rollNo === student?.rollNo)) &&
+          (att.studentId === student?.uid || (att.rollNo && att.rollNo === student?.rollNo) || (att.tempId && att.tempId === student?.tempId)) &&
           (att.subjectId === sub.id || att.subjectName === sub.name || att.subjectId === sub.code)
       ).length;
 
