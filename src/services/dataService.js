@@ -666,45 +666,6 @@ const DEFAULT_USERS = [
     department: "CSE",
     status: "approved",
     createdAt: new Date().toISOString()
-  },
-  {
-    uid: "student_rahul",
-    email: "rahul@bec.ac.in",
-    name: "Rahul Kumar",
-    rollNo: "2201CS045",
-    branch: "CSE",
-    year: "2nd",
-    section: "A",
-    semester: "3",
-    role: "student",
-    status: "approved",
-    createdAt: new Date().toISOString()
-  },
-  {
-    uid: "student_priya",
-    email: "priya@bec.ac.in",
-    name: "Priya Patel",
-    rollNo: "2201CS048",
-    branch: "CSE",
-    year: "2nd",
-    section: "A",
-    semester: "3",
-    role: "student",
-    status: "approved",
-    createdAt: new Date().toISOString()
-  },
-  {
-    uid: "student_amit",
-    email: "amit@bec.ac.in",
-    name: "Amit Singh",
-    rollNo: "2201ECE012",
-    branch: "ECE",
-    year: "1st",
-    section: "B",
-    semester: "1",
-    role: "student",
-    status: "pending",
-    createdAt: new Date().toISOString()
   }
 ];
 
@@ -714,7 +675,21 @@ export const DataService = {
   // --- USERS ---
   async getUsers() {
     let remoteUsers = [];
+    let deletedUids = new Set();
+
     if (isLiveFirebaseConfigured && db) {
+      try {
+        const delSnap = await getDocs(collection(db, "deleted_users"));
+        delSnap.docs.forEach(d => {
+          deletedUids.add(d.id);
+          const data = d.data() || {};
+          if (data.uid) deletedUids.add(data.uid);
+          if (data.email) deletedUids.add(data.email.toLowerCase());
+        });
+      } catch (e) {
+        console.warn("Could not fetch deleted_users collection:", e.message);
+      }
+
       try {
         const snap = await getDocs(collection(db, "users"));
         remoteUsers = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
@@ -760,7 +735,9 @@ export const DataService = {
       if (u.email) userMap.set(u.email.toLowerCase(), merged);
     });
 
-    const uniqueUsers = Array.from(new Set(Array.from(userMap.values())));
+    const uniqueUsers = Array.from(new Set(Array.from(userMap.values())))
+      .filter(u => !deletedUids.has(u.uid) && !(u.email && deletedUids.has(u.email.toLowerCase())) && !u.isDeleted);
+
     return uniqueUsers;
   },
 
@@ -828,7 +805,17 @@ export const DataService = {
 
   async deleteUser(uid) {
     if (isLiveFirebaseConfigured && db) {
-      await deleteDoc(doc(db, "users", uid));
+      try {
+        await deleteDoc(doc(db, "users", uid));
+      } catch (e) {}
+      try {
+        await setDoc(doc(db, "deleted_users", uid), {
+          uid,
+          deletedAt: new Date().toISOString()
+        });
+      } catch (e) {
+        console.warn("Could not record to deleted_users blacklist:", e.message);
+      }
       return true;
     }
     throw new Error("Firebase is not configured. Cannot delete user.");
