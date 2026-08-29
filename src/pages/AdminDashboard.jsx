@@ -13,7 +13,7 @@ import {
   Trash2, Plus, RefreshCw, CheckCircle, AlertCircle, Layers, ClipboardCheck,
   HeartPulse, Sparkles, AlertTriangle, Camera, Image as ImageIcon,
   Search, Filter, GraduationCap, Percent, CheckCircle2, Calendar, Clock, School,
-  BarChart3
+  BarChart3, Edit3, Save
 } from "lucide-react";
 
 export const AdminDashboard = () => {
@@ -88,14 +88,74 @@ export const AdminDashboard = () => {
   const [attError, setAttError] = useState("");
   const [attProcessing, setAttProcessing] = useState(false);
 
-  // Medical Relief / Attendance Override State
-  const [medStudentId, setMedStudentId] = useState("");
-  const [medTargetPct, setMedTargetPct] = useState("75");
-  const [medReason, setMedReason] = useState("Medical Grounds (Hospitalization / Certified Illness)");
-  const [medStudentStats, setMedStudentStats] = useState([]);
-  const [medLoading, setMedLoading] = useState(false);
-  const [medSuccess, setMedSuccess] = useState("");
-  const [medError, setMedError] = useState("");
+  // Admin Edit User / Change Branch State
+  const [adminEditingUser, setAdminEditingUser] = useState(null);
+  const [isAdminEditModalOpen, setIsAdminEditModalOpen] = useState(false);
+  const [adminEditSaving, setAdminEditSaving] = useState(false);
+  const [adminEditMsg, setAdminEditMsg] = useState("");
+  const [adminEditError, setAdminEditError] = useState("");
+
+  const handleOpenAdminEdit = (user) => {
+    setAdminEditingUser({
+      ...user,
+      branch: user.branch || user.department || "CSE",
+      section: user.section || "A",
+      year: user.year || "1st",
+      semester: user.semester || "1",
+      dob: user.dob || user.password || "",
+      password: user.password || user.dob || "demo123",
+      regNo: user.regNo || "",
+      rollNo: user.rollNo || user.tempId || "",
+    });
+    setAdminEditMsg("");
+    setAdminEditError("");
+    setIsAdminEditModalOpen(true);
+  };
+
+  const handleSaveAdminEdit = async (e) => {
+    e.preventDefault();
+    if (!adminEditingUser) return;
+    setAdminEditSaving(true);
+    setAdminEditMsg("");
+    setAdminEditError("");
+
+    try {
+      const payload = {
+        ...adminEditingUser,
+        name: adminEditingUser.name.trim(),
+        email: adminEditingUser.email.trim().toLowerCase(),
+        branch: adminEditingUser.branch,
+        rawBranch: adminEditingUser.branch === "CSE" ? "Computer Science Engineering" :
+                   adminEditingUser.branch === "Data Science" ? "CSE (Data Science)" :
+                   adminEditingUser.branch === "Mechanical" ? "Mechanical Engineering" :
+                   adminEditingUser.branch === "Mechatronics" ? "Mechatronics Engineering" :
+                   adminEditingUser.branch === "Agriculture" ? "Agriculture Engineering" :
+                   adminEditingUser.branch === "Civil" ? "Civil Engineering" :
+                   adminEditingUser.branch === "Electrical" ? "Electrical Engineering" :
+                   adminEditingUser.branch === "ECE" ? "Electronics & Communication" : adminEditingUser.branch,
+        section: adminEditingUser.section,
+        year: adminEditingUser.year,
+        semester: adminEditingUser.semester,
+        dob: adminEditingUser.dob ? adminEditingUser.dob.trim() : "",
+        password: adminEditingUser.password ? adminEditingUser.password.trim() : (adminEditingUser.dob ? adminEditingUser.dob.trim() : "demo123"),
+        regNo: (adminEditingUser.regNo || "").trim().toUpperCase(),
+        rollNo: (adminEditingUser.rollNo || "").trim().toUpperCase(),
+      };
+
+      await DataService.updateUserProfile(adminEditingUser.uid, payload);
+      setAdminEditMsg(`Successfully updated academic branch & details for "${payload.name}"!`);
+      setTimeout(() => {
+        setIsAdminEditModalOpen(false);
+        setAdminEditingUser(null);
+        setAdminEditMsg("");
+      }, 1000);
+      await loadAdminData();
+    } catch (err) {
+      setAdminEditError(err.message || "Failed to update user.");
+    } finally {
+      setAdminEditSaving(false);
+    }
+  };
 
   const loadAdminData = async () => {
     const allUsers = await DataService.getUsers();
@@ -1185,6 +1245,15 @@ export const AdminDashboard = () => {
                             </span>
                           </td>
                           <td className="py-3 px-4 text-right space-x-1.5 whitespace-nowrap">
+                            <button
+                              onClick={() => handleOpenAdminEdit(u)}
+                              className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg font-bold text-[11px] inline-flex items-center gap-1 transition-colors cursor-pointer"
+                              title={u.role === "student" ? "Change Student Branch, Section & Details" : "Edit User Profile"}
+                            >
+                              <Edit3 className="w-3.5 h-3.5 text-amber-600" />
+                              <span>{u.role === "student" ? "Change Branch / Edit" : "Edit"}</span>
+                            </button>
+
                             {u.role === "teacher" && (
                               <button
                                 onClick={() => setSelectedTeacherReport(u)}
@@ -2730,6 +2799,263 @@ export const AdminDashboard = () => {
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================
+            ADMIN EDIT STUDENT / CHANGE BRANCH & ACADEMIC MODAL
+            ======================================================== */}
+        {isAdminEditModalOpen && adminEditingUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in">
+            <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl border border-blue-100 max-h-[90vh] overflow-y-auto space-y-5">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+                    <Edit3 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-slate-900">
+                      {adminEditingUser.role === "student" ? "Change Branch & Student Details" : "Edit User Profile"}
+                    </h3>
+                    <p className="text-xs text-slate-500 font-mono">{adminEditingUser.email}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAdminEditModalOpen(false);
+                    setAdminEditingUser(null);
+                  }}
+                  className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {adminEditMsg && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl font-bold flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-emerald-600" />
+                  <span>{adminEditMsg}</span>
+                </div>
+              )}
+
+              {adminEditError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl font-bold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-600" />
+                  <span>{adminEditError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleSaveAdminEdit} className="space-y-4">
+                {/* Full Name */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={adminEditingUser.name || ""}
+                    onChange={(e) => setAdminEditingUser({ ...adminEditingUser, name: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Institutional Email
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={adminEditingUser.email || ""}
+                    onChange={(e) => setAdminEditingUser({ ...adminEditingUser, email: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Student Academic & Branch Allocation */}
+                {adminEditingUser.role === "student" && (
+                  <div className="p-4 bg-blue-50/60 rounded-2xl border border-blue-200/80 space-y-3">
+                    <span className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
+                      <GraduationCap className="w-4 h-4 text-blue-700" /> Academic &amp; Branch Allocation:
+                    </span>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                          Branch / Stream
+                        </label>
+                        <select
+                          value={adminEditingUser.branch || "CSE"}
+                          onChange={(e) => {
+                            const nextBranch = e.target.value;
+                            // Suggest matching section for convenience
+                            let suggestedSec = adminEditingUser.section;
+                            if (nextBranch === "CSE") suggestedSec = "A";
+                            else if (nextBranch === "Data Science") suggestedSec = "B";
+                            else if (["Mechanical", "Mechatronics", "Agriculture"].includes(nextBranch)) suggestedSec = "C";
+                            else suggestedSec = "D";
+
+                            setAdminEditingUser({
+                              ...adminEditingUser,
+                              branch: nextBranch,
+                              section: suggestedSec
+                            });
+                          }}
+                          className="w-full p-2.5 bg-white border border-blue-300 rounded-xl text-xs font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                        >
+                          <option value="CSE">CSE (Computer Science)</option>
+                          <option value="Data Science">Data Science (CSE Data Science)</option>
+                          <option value="Mechanical">Mechanical Engineering</option>
+                          <option value="Mechatronics">Mechatronics Engineering</option>
+                          <option value="Agriculture">Agriculture Engineering</option>
+                          <option value="Civil">Civil Engineering</option>
+                          <option value="Electrical">Electrical Engineering</option>
+                          <option value="ECE">ECE (Electronics &amp; Comm)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                          Assigned Section
+                        </label>
+                        <select
+                          value={adminEditingUser.section || "A"}
+                          onChange={(e) => setAdminEditingUser({ ...adminEditingUser, section: e.target.value })}
+                          className="w-full p-2.5 bg-white border border-blue-300 rounded-xl text-xs font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                        >
+                          <option value="A">Section A (CSE)</option>
+                          <option value="B">Section B (Data Science)</option>
+                          <option value="C">Section C (Mech / Mechatronics / Agri)</option>
+                          <option value="D">Section D (Civil / Electrical / ECE / Aero)</option>
+                          <option value="A+B Combine">A+B Combine (Joint CSE + DS)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Academic Year</label>
+                        <select
+                          value={adminEditingUser.year || "1st"}
+                          onChange={(e) => setAdminEditingUser({ ...adminEditingUser, year: e.target.value })}
+                          className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold"
+                        >
+                          <option value="1st">1st Year</option>
+                          <option value="2nd">2nd Year</option>
+                          <option value="3rd">3rd Year</option>
+                          <option value="4th">4th Year</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Semester</label>
+                        <select
+                          value={adminEditingUser.semester || "1"}
+                          onChange={(e) => setAdminEditingUser({ ...adminEditingUser, semester: e.target.value })}
+                          className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold"
+                        >
+                          <option value="1">Semester 1</option>
+                          <option value="2">Semester 2</option>
+                          <option value="3">Semester 3</option>
+                          <option value="4">Semester 4</option>
+                          <option value="5">Semester 5</option>
+                          <option value="6">Semester 6</option>
+                          <option value="7">Semester 7</option>
+                          <option value="8">Semester 8</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                          Temp ID / Roll No
+                        </label>
+                        <input
+                          type="text"
+                          value={adminEditingUser.rollNo || ""}
+                          onChange={(e) => setAdminEditingUser({ ...adminEditingUser, rollNo: e.target.value, tempId: e.target.value })}
+                          className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-blue-900"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                          BPUT Reg No (Permanent)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 2401297076"
+                          value={adminEditingUser.regNo || ""}
+                          onChange={(e) => setAdminEditingUser({ ...adminEditingUser, regNo: e.target.value })}
+                          className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-emerald-800"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Date of Birth & Password */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                      Date of Birth (YYYY-MM-DD)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="2007-01-15"
+                      value={adminEditingUser.dob || ""}
+                      onChange={(e) => {
+                        const nextDob = e.target.value;
+                        setAdminEditingUser({
+                          ...adminEditingUser,
+                          dob: nextDob,
+                          password: nextDob
+                        });
+                      }}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-semibold text-blue-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                      Login Password
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Login Password"
+                      value={adminEditingUser.password || ""}
+                      onChange={(e) => setAdminEditingUser({ ...adminEditingUser, password: e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-semibold text-blue-900"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-slate-100 flex items-center justify-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAdminEditModalOpen(false);
+                      setAdminEditingUser(null);
+                    }}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={adminEditSaving}
+                    className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-colors shadow-md shadow-blue-500/20 cursor-pointer inline-flex items-center gap-1.5"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>{adminEditSaving ? "Saving..." : "Save Changes"}</span>
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
