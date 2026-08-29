@@ -791,7 +791,7 @@ export const DataService = {
 
   async updateUserStatus(uid, status) {
     if (isLiveFirebaseConfigured && db) {
-      await updateDoc(doc(db, "users", uid), { status });
+      await setDoc(doc(db, "users", uid), { status, updatedAt: new Date().toISOString() }, { merge: true });
       return true;
     }
     throw new Error("Firebase is not configured. Cannot update user status.");
@@ -799,8 +799,16 @@ export const DataService = {
 
   async updateUserProfile(uid, data) {
     if (isLiveFirebaseConfigured && db) {
-      await updateDoc(doc(db, "users", uid), data);
-      return true;
+      try {
+        const existing = await this.getUserById(uid);
+        const fullPayload = { ...(existing || {}), ...data, updatedAt: new Date().toISOString() };
+        await setDoc(doc(db, "users", uid), fullPayload, { merge: true });
+        return true;
+      } catch (e) {
+        console.warn("Firestore updateUserProfile failed, fallback direct merge:", e.message);
+        await setDoc(doc(db, "users", uid), { ...data, updatedAt: new Date().toISOString() }, { merge: true });
+        return true;
+      }
     }
     throw new Error("Firebase is not configured. Cannot update user profile.");
   },
