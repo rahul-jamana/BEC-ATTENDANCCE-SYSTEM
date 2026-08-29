@@ -9,7 +9,7 @@ import {
   Trash2, CheckCircle2, AlertCircle, RefreshCw, KeyRound, 
   Sparkles, Layers, Lock, Mail, User, BookOpen, Check, X, 
   ShieldAlert, Eye, EyeOff, Key, LogOut, ShieldCheck, LockKeyhole,
-  Search, Filter
+  Search, Filter, Edit3, Save
 } from "lucide-react";
 
 export const AyushMasterPortal = () => {
@@ -61,6 +61,57 @@ export const AyushMasterPortal = () => {
     subjectName: "",
     status: "approved"
   });
+
+  // Edit User State
+  const [editingUser, setEditingUser] = useState(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+
+  const handleOpenEdit = (user) => {
+    setEditingUser({
+      ...user,
+      dob: user.dob || user.password || "",
+      password: user.password || user.dob || "demo123",
+      regNo: user.regNo || "",
+      rollNo: user.rollNo || user.tempId || "",
+      phone: user.phone || "",
+      gender: user.gender || "Male",
+      section: user.section || "A",
+      branch: user.branch || user.department || "CSE"
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    setEditSaving(true);
+    setErrorMsg("");
+    setSuccessMsg("");
+
+    try {
+      // Ensure password syncs with dob if user changed dob and didn't provide custom password
+      const payload = {
+        ...editingUser,
+        name: editingUser.name.trim(),
+        email: editingUser.email.trim().toLowerCase(),
+        dob: editingUser.dob ? editingUser.dob.trim() : "",
+        password: editingUser.password ? editingUser.password.trim() : (editingUser.dob ? editingUser.dob.trim() : "demo123"),
+        regNo: (editingUser.regNo || "").trim().toUpperCase(),
+        rollNo: (editingUser.rollNo || "").trim().toUpperCase(),
+      };
+
+      await DataService.updateUserProfile(editingUser.uid, payload);
+      setSuccessMsg(`Successfully updated profile & credentials for "${payload.name}"!`);
+      setIsEditModalOpen(false);
+      setEditingUser(null);
+      await loadAllUsers();
+    } catch (err) {
+      setErrorMsg(err.message || "Failed to update user profile.");
+    } finally {
+      setEditSaving(false);
+    }
+  };
 
   const loadAllUsers = async () => {
     setLoading(true);
@@ -1008,17 +1059,19 @@ export const AyushMasterPortal = () => {
                           </span>
                         </td>
 
-                        {/* Visible Password Column for Ayush */}
+                        {/* Visible Password / DOB Column for Ayush */}
                         <td className="py-3.5 px-4">
-                          <span className="font-mono text-xs font-bold text-blue-900 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">
-                            {u.password || "demo123"}
+                          <span className="font-mono text-xs font-bold text-blue-900 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200" title="DOB / Login Password">
+                            {u.dob || u.password || "demo123"}
                           </span>
                         </td>
 
                         <td className="py-3.5 px-4 text-slate-700">
                           {u.role === "student" ? (
                             <div>
-                              <span className="font-mono text-blue-700 font-bold">{u.rollNo}</span> • <span className="font-semibold text-slate-900">{u.branch}</span> ({u.year} Yr Sec-{u.section} Sem {u.semester || "1"})
+                              <span className="font-mono text-blue-700 font-bold">{u.rollNo}</span>
+                              {u.regNo ? <span className="ml-1 text-[11px] font-mono text-emerald-700 font-bold">({u.regNo})</span> : null}
+                              {" "}• <span className="font-semibold text-slate-900">{u.branch}</span> ({u.year} Yr Sec-{u.section} Sem {u.semester || "1"})
                             </div>
                           ) : u.role === "teacher" ? (
                             <div>{u.department} Dept • {u.subjectName || "Core Faculty"}</div>
@@ -1042,6 +1095,15 @@ export const AyushMasterPortal = () => {
                         </td>
 
                         <td className="py-3.5 px-4 text-right space-x-2">
+                          <button
+                            onClick={() => handleOpenEdit(u)}
+                            className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold rounded-xl text-[11px] transition-colors cursor-pointer inline-flex items-center gap-1 shadow-xs"
+                            title="Edit Profile, DOB, Password & Reg No"
+                          >
+                            <Edit3 className="w-3 h-3 text-amber-600" />
+                            <span>Edit</span>
+                          </button>
+
                           <button
                             onClick={() => handleInstantSwitch(u)}
                             className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-[11px] transition-colors cursor-pointer inline-flex items-center gap-1 shadow-xs"
@@ -1093,7 +1155,7 @@ export const AyushMasterPortal = () => {
                       userRoleFilter === "all" ? "bg-blue-600 text-white shadow-sm" : "bg-white text-slate-600 border border-slate-200"
                     }`}
                   >
-                    🌐 All ({users.length})
+                    All Roles ({users.length})
                   </button>
                   <button
                     type="button"
@@ -1102,7 +1164,7 @@ export const AyushMasterPortal = () => {
                       userRoleFilter === "admin" ? "bg-purple-600 text-white shadow-sm" : "bg-white text-slate-600 border border-slate-200"
                     }`}
                   >
-                    🛡️ Admins ({users.filter(u => u.role === "admin").length})
+                    👑 Admins ({users.filter(u => u.role === "admin").length})
                   </button>
                   <button
                     type="button"
@@ -1158,9 +1220,14 @@ export const AyushMasterPortal = () => {
                   className="p-1.5 bg-white border border-slate-200 rounded-lg font-semibold text-slate-700 cursor-pointer"
                 >
                   <option value="all">All Branches / Depts</option>
-                  {DataService.getDepartments().map(b => (
-                    <option key={b} value={b}>{b}</option>
-                  ))}
+                  <option value="CSE">CSE</option>
+                  <option value="Data Science">CSE (Data Science)</option>
+                  <option value="Mechanical">Mechanical</option>
+                  <option value="Mechatronics">Mechatronics</option>
+                  <option value="Agriculture">Agriculture</option>
+                  <option value="Civil">Civil</option>
+                  <option value="Electrical">Electrical</option>
+                  <option value="ECE">ECE</option>
                 </select>
 
                 {/* Year Filter */}
@@ -1170,9 +1237,10 @@ export const AyushMasterPortal = () => {
                   className="p-1.5 bg-white border border-slate-200 rounded-lg font-semibold text-slate-700 cursor-pointer"
                 >
                   <option value="all">All Years</option>
-                  {DataService.getYears().map(y => (
-                    <option key={y} value={y}>{y} Year</option>
-                  ))}
+                  <option value="1st">1st Year</option>
+                  <option value="2nd">2nd Year</option>
+                  <option value="3rd">3rd Year</option>
+                  <option value="4th">4th Year</option>
                 </select>
 
                 {/* Section Filter */}
@@ -1182,9 +1250,11 @@ export const AyushMasterPortal = () => {
                   className="p-1.5 bg-white border border-slate-200 rounded-lg font-semibold text-slate-700 cursor-pointer"
                 >
                   <option value="all">All Sections</option>
-                  {DataService.getSections().map(s => (
-                    <option key={s} value={s}>Sec {s}</option>
-                  ))}
+                  <option value="A">Section A</option>
+                  <option value="B">Section B</option>
+                  <option value="C">Section C</option>
+                  <option value="D">Section D</option>
+                  <option value="A+B Combine">A+B Combine</option>
                 </select>
 
                 {(userBranchFilter !== "all" || userYearFilter !== "all" || userSectionFilter !== "all" || userSearchQuery) && (
@@ -1196,7 +1266,7 @@ export const AyushMasterPortal = () => {
                       setUserSectionFilter("all");
                       setUserSearchQuery("");
                     }}
-                    className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded-md font-bold text-[11px] cursor-pointer"
+                    className="text-xs text-rose-600 hover:underline font-bold ml-auto cursor-pointer"
                   >
                     Reset Filters
                   </button>
@@ -1206,17 +1276,17 @@ export const AyushMasterPortal = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredUsers.length === 0 ? (
-                <div className="col-span-full py-8 text-center text-slate-400">
-                  No accounts found for the selected filter.
+                <div className="col-span-full text-center py-12 text-slate-400">
+                  <User className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm font-semibold">No accounts match your current search/filter.</p>
                 </div>
               ) : (
                 filteredUsers.map((u) => (
                   <div
                     key={u.uid}
-                    onClick={() => handleInstantSwitch(u)}
-                    className="p-5 rounded-2xl bg-slate-50/80 hover:bg-blue-50/80 border border-slate-200 hover:border-blue-300 transition-all cursor-pointer group flex flex-col justify-between space-y-3 shadow-xs"
+                    className="group bg-slate-50 hover:bg-blue-50/60 p-5 rounded-2xl border border-slate-200 hover:border-blue-300 transition-all shadow-xs flex flex-col justify-between space-y-3 relative"
                   >
-                    <div className="flex items-start justify-between">
+                    <div className="flex items-center justify-between">
                       <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${
                         u.role === "admin"
                           ? "bg-purple-100 text-purple-800 border border-purple-200"
@@ -1227,9 +1297,23 @@ export const AyushMasterPortal = () => {
                         {u.role}
                       </span>
 
-                      <span className={`text-[10px] font-bold ${u.status === "approved" ? "text-emerald-700" : "text-amber-700"}`}>
-                        {u.status === "approved" ? "✅ Active" : "⏳ Pending"}
-                      </span>
+                      <div className="flex items-center space-x-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenEdit(u);
+                          }}
+                          className="px-2 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-[10px] font-bold cursor-pointer transition-colors inline-flex items-center gap-0.5"
+                          title="Edit User"
+                        >
+                          <Edit3 className="w-2.5 h-2.5" />
+                          <span>Edit</span>
+                        </button>
+                        <span className={`text-[10px] font-bold ${u.status === "approved" ? "text-emerald-700" : "text-amber-700"}`}>
+                          {u.status === "approved" ? "✅ Active" : "⏳ Pending"}
+                        </span>
+                      </div>
                     </div>
 
                     <div>
@@ -1238,11 +1322,12 @@ export const AyushMasterPortal = () => {
                       </h3>
                       <p className="text-slate-500 font-mono text-xs">{u.email}</p>
                       <p className="text-xs text-slate-600 mt-1 font-mono font-medium">
-                        Password: <span className="font-bold text-blue-700">{u.password || "demo123"}</span>
+                        Password (DOB): <span className="font-bold text-blue-700">{u.dob || u.password || "demo123"}</span>
                       </p>
                       {u.role === "student" && (
                         <p className="text-xs text-slate-500 mt-1">
                           <span className="font-semibold text-slate-800">{u.branch}</span> • {u.year} Yr (Sec {u.section}) • Roll: <span className="font-mono text-slate-800 font-bold">{u.rollNo}</span>
+                          {u.regNo && <span className="block text-[11px] font-mono text-emerald-700 font-bold">Reg: {u.regNo}</span>}
                         </p>
                       )}
                       {u.role === "teacher" && (
@@ -1252,10 +1337,14 @@ export const AyushMasterPortal = () => {
                       )}
                     </div>
 
-                    <div className="pt-3 border-t border-slate-200 flex items-center justify-between text-xs text-blue-700 font-bold">
+                    <button
+                      type="button"
+                      onClick={() => handleInstantSwitch(u)}
+                      className="pt-3 border-t border-slate-200 flex items-center justify-between text-xs text-blue-700 font-bold hover:text-blue-900 w-full cursor-pointer text-left"
+                    >
                       <span>Jump to Dashboard</span>
                       <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                    </div>
+                    </button>
                   </div>
                 ))
               )}

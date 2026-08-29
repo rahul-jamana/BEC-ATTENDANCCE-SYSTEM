@@ -210,7 +210,11 @@ export const AuthProvider = ({ children }) => {
   const updateProfile = async (updatedFields) => {
     if (!userProfile?.uid) throw new Error("No user logged in.");
     await DataService.updateUserProfile(userProfile.uid, updatedFields);
-    const newProfile = { ...userProfile, ...updatedFields };
+    const newProfile = { 
+      ...userProfile, 
+      ...updatedFields,
+      password: updatedFields.password || (updatedFields.dob ? updatedFields.dob : userProfile.password)
+    };
     setUserProfile(newProfile);
     localStorage.setItem("bec_session_user", JSON.stringify(newProfile));
     return newProfile;

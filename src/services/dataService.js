@@ -752,6 +752,10 @@ export const DataService = {
     remoteUsers.forEach(u => {
       const existing = userMap.get(u.uid) || (u.email ? userMap.get(u.email.toLowerCase()) : null) || {};
       const merged = { ...existing, ...u };
+      // Ensure password follows dob if dob was updated or if password is missing
+      if (merged.dob && (!merged.password || merged.password.startsWith("2026-") || merged.password.startsWith("2025-") || merged.password.startsWith("2024-"))) {
+        merged.password = merged.dob;
+      }
       userMap.set(u.uid, merged);
       if (u.email) userMap.set(u.email.toLowerCase(), merged);
     });
@@ -801,12 +805,21 @@ export const DataService = {
     if (isLiveFirebaseConfigured && db) {
       try {
         const existing = await this.getUserById(uid);
-        const fullPayload = { ...(existing || {}), ...data, updatedAt: new Date().toISOString() };
+        const payloadData = { ...data };
+        // If dob is updated and password not explicitly provided, synchronize password to match dob
+        if (payloadData.dob && !payloadData.password) {
+          payloadData.password = payloadData.dob;
+        }
+        const fullPayload = { ...(existing || {}), ...payloadData, updatedAt: new Date().toISOString() };
         await setDoc(doc(db, "users", uid), fullPayload, { merge: true });
         return true;
       } catch (e) {
         console.warn("Firestore updateUserProfile failed, fallback direct merge:", e.message);
-        await setDoc(doc(db, "users", uid), { ...data, updatedAt: new Date().toISOString() }, { merge: true });
+        const fallbackData = { ...data };
+        if (fallbackData.dob && !fallbackData.password) {
+          fallbackData.password = fallbackData.dob;
+        }
+        await setDoc(doc(db, "users", uid), { ...fallbackData, updatedAt: new Date().toISOString() }, { merge: true });
         return true;
       }
     }
