@@ -19,15 +19,36 @@ const DEFAULT_SEMESTERS = ["1", "2", "3", "4", "5", "6", "7", "8"];
 // BPUT B.Tech Semester-wise Subject Catalog (Curriculum 2024)
 // ──────────────────────────────────────────────────────────────
 const BPUT_CURRICULUM = {
-  // ─── COMMON 1st YEAR (All Branches) ───
+  // ─── COMMON 1st YEAR (All Branches & Sections A, B, C, D) ───
   common: {
     "1": [
-      { name: "Mathematics-I", code: "MA101" },
-      { name: "Physics", code: "PH101" },
-      { name: "Basic Electrical Engineering", code: "EE101" },
-      { name: "Programming for Problem Solving (C)", code: "CS101" },
-      { name: "Engineering Graphics", code: "ME101" },
-      { name: "English", code: "HS101" },
+      // Theory Subjects
+      { name: "Mathematics-I (Math-1)", code: "MA101" },
+      { name: "Physics (PHY)", code: "PH101" },
+      { name: "Chemistry (CHEM)", code: "CH101" },
+      { name: "Basic Electrical Engineering (BEE)", code: "EE101" },
+      { name: "Basic Electronics (BE)", code: "EC101" },
+      { name: "Basic Mechanical Engineering (BME)", code: "ME101" },
+      { name: "Basic Civil Engineering (BCE)", code: "CE101" },
+      { name: "Programming in C & Data Structures (PC&DS)", code: "CS101" },
+      { name: "Universal Human Values (UHV)", code: "HS103" },
+      { name: "Engineering Mechanics (EM)", code: "ME102" },
+      { name: "English for Technical Writing (EFTW)", code: "HS101" },
+
+      // Labs, Practicals & Workshops
+      { name: "Programming Lab (PC&DS Lab Group-I / II)", code: "CS191" },
+      { name: "Physics Lab (PHY Lab Group-I / II)", code: "PH191" },
+      { name: "Chemistry Lab (CHEM Lab Group-I / II)", code: "CH191" },
+      { name: "Basic Electrical Lab (BEE Lab Group-I / II)", code: "EE191" },
+      { name: "Basic Electronics Lab (BE Lab Group-I / II)", code: "EC191" },
+      { name: "Civil Engineering Lab (CE Lab Group-I / II)", code: "CE191" },
+      { name: "Workshop Practice (Workshop Group-I / II)", code: "ME191" },
+      { name: "Engineering Graphics & Design (EG&D Lab Group-I / II)", code: "ME192" },
+
+      // Co-Curricular & Student Activities
+      { name: "Yoga / NSS", code: "ACT101" },
+      { name: "Club Activity", code: "ACT102" },
+      { name: "Library (LIB)", code: "LIB101" },
     ],
     "2": [
       { name: "Mathematics-II", code: "MA102" },
@@ -36,6 +57,7 @@ const BPUT_CURRICULUM = {
       { name: "Engineering Mechanics", code: "ME102" },
       { name: "Environmental Science", code: "HS102" },
       { name: "Workshop Practice", code: "ME103" },
+      { name: "English Communication Lab", code: "HS191" },
     ],
   },
 
