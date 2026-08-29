@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import { DataService } from "../services/dataService";
 import { 
   X, CheckCircle2, Search, Users, UserCheck, AlertCircle, 
-  Sparkles, ShieldCheck, Check, Filter, Layers, BookOpen
+  Sparkles, ShieldCheck, Check, Filter, Layers, BookOpen,
+  UserX, RefreshCw
 } from "lucide-react";
 
 export const TeacherManualAttendanceModal = ({ isOpen, onClose, session, onAttendanceUpdated }) => {
@@ -10,6 +11,7 @@ export const TeacherManualAttendanceModal = ({ isOpen, onClose, session, onAtten
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSectionFilter, setSelectedSectionFilter] = useState("all");
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState("all"); // "all" | "present" | "absent"
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [successToast, setSuccessToast] = useState("");
@@ -69,6 +71,7 @@ export const TeacherManualAttendanceModal = ({ isOpen, onClose, session, onAtten
       loadData();
       setSearchQuery("");
       setSelectedSectionFilter("all");
+      setSelectedStatusFilter("all");
     }
   }, [isOpen, session]);
 
@@ -108,10 +111,35 @@ export const TeacherManualAttendanceModal = ({ isOpen, onClose, session, onAtten
     }
   };
 
+  const handleMarkAbsent = async (student) => {
+    setActionLoadingId(student.uid);
+    try {
+      await DataService.teacherManualRemoveAttendance({
+        sessionId: session.id,
+        studentId: student.uid,
+        rollNo: student.rollNo || student.tempId
+      });
+
+      setSuccessToast(`Marked ${student.name} as Absent!`);
+      setTimeout(() => setSuccessToast(""), 3000);
+
+      const allAtt = await DataService.getAttendance();
+      setAttendanceRecords(allAtt.filter(a => a.sessionId === session.id));
+
+      if (onAttendanceUpdated) {
+        onAttendanceUpdated();
+      }
+    } catch (err) {
+      alert("Failed to mark absent: " + err.message);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
   const handleMarkAllPresent = async () => {
     const unpresent = filteredStudents.filter(s => !isStudentPresent(s));
     if (unpresent.length === 0) {
-      alert("All students in this list are already marked present!");
+      alert("All students in this view are already marked present!");
       return;
     }
 
@@ -143,23 +171,66 @@ export const TeacherManualAttendanceModal = ({ isOpen, onClose, session, onAtten
     }
   };
 
+  const handleMarkAllAbsent = async () => {
+    const presentList = filteredStudents.filter(isStudentPresent);
+    if (presentList.length === 0) {
+      alert("All students in this view are already absent!");
+      return;
+    }
+
+    const confirm = window.confirm(`Mark all ${presentList.length} present students as Absent (revoke attendance)?`);
+    if (!confirm) return;
+
+    setLoading(true);
+    try {
+      for (const student of presentList) {
+        await DataService.teacherManualRemoveAttendance({
+          sessionId: session.id,
+          studentId: student.uid,
+          rollNo: student.rollNo || student.tempId
+        });
+      }
+      setSuccessToast(`Successfully marked ${presentList.length} students as Absent!`);
+      setTimeout(() => setSuccessToast(""), 3500);
+
+      const allAtt = await DataService.getAttendance();
+      setAttendanceRecords(allAtt.filter(a => a.sessionId === session.id));
+
+      if (onAttendanceUpdated) {
+        onAttendanceUpdated();
+      }
+    } catch (err) {
+      alert("Error clearing attendance: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredStudents = students.filter(s => {
     const query = searchQuery.toLowerCase();
     const matchQuery = 
       (s.name || "").toLowerCase().includes(query) ||
       (s.rollNo || "").toLowerCase().includes(query) ||
       (s.tempId || "").toLowerCase().includes(query) ||
+      (s.regNo || "").toLowerCase().includes(query) ||
       (s.email || "").toLowerCase().includes(query);
 
     const matchSection = 
       selectedSectionFilter === "all" || 
       (s.section || "").toLowerCase() === selectedSectionFilter.toLowerCase();
 
-    return matchQuery && matchSection;
+    const present = isStudentPresent(s);
+    const matchStatus = 
+      selectedStatusFilter === "all" ||
+      (selectedStatusFilter === "present" && present) ||
+      (selectedStatusFilter === "absent" && !present);
+
+    return matchQuery && matchSection && matchStatus;
   });
 
   const presentCount = students.filter(isStudentPresent).length;
   const totalCount = students.length;
+  const absentCount = totalCount - presentCount;
   const attendancePercentage = totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0;
 
   return (
@@ -206,21 +277,92 @@ export const TeacherManualAttendanceModal = ({ isOpen, onClose, session, onAtten
           </div>
         )}
 
-        {/* Toolbar: Stats, Search & Bulk Actions */}
-        <div className="p-4 sm:p-5 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="bg-white px-3.5 py-2 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-2">
-              <Users className="w-4 h-4 text-blue-600" />
-              <span className="text-xs font-bold text-slate-700">
-                Present: <strong className="text-emerald-600 font-black">{presentCount}</strong> / {totalCount} ({attendancePercentage}%)
-              </span>
+        {/* Toolbar: Stats, Filters & Bulk Actions */}
+        <div className="p-4 sm:p-5 bg-slate-50 border-b border-slate-200 space-y-3">
+          
+          {/* Top Row: Attendance Pill and Status Tabs */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-xs flex items-center gap-2 text-xs font-bold text-slate-700">
+                <Users className="w-4 h-4 text-blue-600" />
+                <span>Total: {totalCount}</span>
+                <span className="text-emerald-700">Present: {presentCount}</span>
+                <span className="text-rose-700">Absent: {absentCount}</span>
+                <span className="text-blue-700">({attendancePercentage}%)</span>
+              </div>
+
+              {/* Status Filter Tabs: All, Present, Absent */}
+              <div className="flex items-center bg-slate-200/80 p-1 rounded-xl gap-1 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setSelectedStatusFilter("all")}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                    selectedStatusFilter === "all" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  All ({totalCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedStatusFilter("present")}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                    selectedStatusFilter === "present" ? "bg-emerald-600 text-white shadow-xs" : "text-emerald-700 hover:bg-white/60"
+                  }`}
+                >
+                  ✅ Present ({presentCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedStatusFilter("absent")}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                    selectedStatusFilter === "absent" ? "bg-rose-600 text-white shadow-xs" : "text-rose-700 hover:bg-white/60"
+                  }`}
+                >
+                  ❌ Absent ({absentCount})
+                </button>
+              </div>
+            </div>
+
+            {/* Bulk Action Buttons */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleMarkAllPresent}
+                disabled={loading || absentCount === 0}
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1 cursor-pointer transition-colors"
+                title="Mark all absent students as present"
+              >
+                <Check className="w-3.5 h-3.5" /> Mark All Present
+              </button>
+
+              <button
+                onClick={handleMarkAllAbsent}
+                disabled={loading || presentCount === 0}
+                className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 disabled:opacity-50 text-rose-700 border border-rose-200 text-xs font-bold rounded-xl shadow-xs flex items-center gap-1 cursor-pointer transition-colors"
+                title="Reset / mark all students as absent"
+              >
+                <UserX className="w-3.5 h-3.5" /> Mark All Absent
+              </button>
+            </div>
+          </div>
+
+          {/* Bottom Row: Search Box and Section Selector */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search student by name, roll no, reg no, email..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-medium"
+              />
             </div>
 
             {isCombinedSession && (
               <select
                 value={selectedSectionFilter}
                 onChange={(e) => setSelectedSectionFilter(e.target.value)}
-                className="text-xs font-semibold px-3 py-2 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500"
+                className="text-xs font-semibold px-3 py-2 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 cursor-pointer"
               >
                 <option value="all">All Sections (A &amp; B)</option>
                 <option value="a">Section A (CSE)</option>
@@ -229,26 +371,6 @@ export const TeacherManualAttendanceModal = ({ isOpen, onClose, session, onAtten
             )}
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1 sm:w-64">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search student or roll no..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <button
-              onClick={handleMarkAllPresent}
-              disabled={loading || presentCount === totalCount}
-              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-sm flex items-center gap-1.5 cursor-pointer shrink-0 transition-colors"
-            >
-              <Check className="w-3.5 h-3.5" /> Mark All Present
-            </button>
-          </div>
         </div>
 
         {/* Student Roster Table */}
@@ -262,7 +384,7 @@ export const TeacherManualAttendanceModal = ({ isOpen, onClose, session, onAtten
             <div className="py-16 text-center text-slate-400 space-y-2">
               <Users className="w-10 h-10 mx-auto stroke-1" />
               <p className="text-sm font-bold text-slate-600">No students found matching the filter</p>
-              <p className="text-xs">Try adjusting your search query or section filter.</p>
+              <p className="text-xs">Try adjusting your search query, status tab, or section filter.</p>
             </div>
           ) : (
             <div className="space-y-2.5">
@@ -275,19 +397,19 @@ export const TeacherManualAttendanceModal = ({ isOpen, onClose, session, onAtten
                     key={student.uid || idx}
                     className={`flex items-center justify-between p-3 sm:p-3.5 rounded-2xl border transition-all ${
                       present
-                        ? "bg-emerald-50/70 border-emerald-200/80"
-                        : "bg-white border-slate-200 hover:border-blue-300"
+                        ? "bg-emerald-50/70 border-emerald-200/80 hover:border-emerald-300"
+                        : "bg-rose-50/40 border-rose-100 hover:border-rose-200"
                     }`}
                   >
                     <div className="flex items-center space-x-3 min-w-0">
                       <div
                         className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
                           present
-                            ? "bg-emerald-600 text-white shadow-sm"
-                            : "bg-slate-100 text-slate-700"
+                            ? "bg-emerald-600 text-white shadow-xs"
+                            : "bg-rose-100 text-rose-700"
                         }`}
                       >
-                        {present ? <Check className="w-4 h-4" /> : idx + 1}
+                        {present ? <Check className="w-4 h-4" /> : "✕"}
                       </div>
 
                       <div className="min-w-0">
@@ -298,6 +420,11 @@ export const TeacherManualAttendanceModal = ({ isOpen, onClose, session, onAtten
                           <span className="font-mono text-[11px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
                             {student.rollNo || student.tempId}
                           </span>
+                          {student.regNo && (
+                            <span className="font-mono text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                              Reg: {student.regNo}
+                            </span>
+                          )}
                           <span className="text-[10px] font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
                             Sec {student.section}
                           </span>
@@ -311,19 +438,38 @@ export const TeacherManualAttendanceModal = ({ isOpen, onClose, session, onAtten
                       </div>
                     </div>
 
+                    {/* Action Buttons: Mark Present vs Mark Absent */}
                     <div className="flex items-center gap-2 shrink-0">
                       {present ? (
-                        <span className="px-3 py-1.5 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-bold flex items-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Present
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-bold flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Present
+                          </span>
+                          <button
+                            onClick={() => handleMarkAbsent(student)}
+                            disabled={isUpdating}
+                            className="px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-xl transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                            title="Unmark attendance (Change to Absent)"
+                          >
+                            <UserX className="w-3 h-3 text-rose-500" />
+                            <span>{isUpdating ? "Updating..." : "Mark Absent"}</span>
+                          </button>
+                        </div>
                       ) : (
-                        <button
-                          onClick={() => handleMarkPresent(student)}
-                          disabled={isUpdating}
-                          className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all hover:scale-105 cursor-pointer disabled:opacity-50"
-                        >
-                          {isUpdating ? "Marking..." : "Mark Present"}
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <span className="px-2.5 py-1 bg-rose-100 text-rose-800 border border-rose-200 rounded-xl text-xs font-bold">
+                            ❌ Absent
+                          </span>
+                          <button
+                            onClick={() => handleMarkPresent(student)}
+                            disabled={isUpdating}
+                            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all hover:scale-105 cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                            title="Mark student as Present"
+                          >
+                            <Check className="w-3 h-3" />
+                            <span>{isUpdating ? "Marking..." : "Mark Present"}</span>
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -336,7 +482,7 @@ export const TeacherManualAttendanceModal = ({ isOpen, onClose, session, onAtten
         {/* Footer */}
         <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
           <span>
-            Showing <strong>{filteredStudents.length}</strong> of {totalCount} students
+            Showing <strong>{filteredStudents.length}</strong> of {totalCount} students ({presentCount} Present, {absentCount} Absent)
           </span>
           <button
             onClick={onClose}

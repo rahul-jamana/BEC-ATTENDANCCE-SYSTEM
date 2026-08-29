@@ -1012,7 +1012,7 @@ export const DataService = {
     return newRecord;
   },
 
-  // --- TEACHER MANUAL ATTENDANCE (Fallback when QR code fails) ---
+  // --- TEACHER MANUAL ATTENDANCE (Fallback & Corrections) ---
   async teacherManualMarkAttendance({ session, student, teacherName, reason = "Manual Attendance (QR Fallback)" }) {
     if (!isLiveFirebaseConfigured || !db) {
       throw new Error("Firebase is not configured. Cannot record attendance.");
@@ -1026,6 +1026,44 @@ export const DataService = {
       isManual: true,
       markedBy: teacherName || session?.teacherName || "Faculty"
     });
+  },
+
+  async teacherManualRemoveAttendance({ sessionId, studentId, rollNo }) {
+    if (!isLiveFirebaseConfigured || !db) {
+      throw new Error("Firebase is not configured. Cannot remove attendance.");
+    }
+
+    const docId = `${sessionId}_${studentId}`;
+    try {
+      await deleteDoc(doc(db, "attendance", docId));
+    } catch (e) {}
+
+    try {
+      const snap = await getDocs(collection(db, "attendance"));
+      const matches = snap.docs.filter(d => {
+        const data = d.data();
+        return data.sessionId === sessionId && (data.studentId === studentId || (rollNo && data.rollNo === rollNo));
+      });
+      for (const m of matches) {
+        await deleteDoc(doc(db, "attendance", m.id));
+      }
+    } catch (e) {
+      console.warn("Error deleting attendance records:", e);
+    }
+    return true;
+  },
+
+  async teacherManualResetSessionAttendance({ sessionId }) {
+    if (!isLiveFirebaseConfigured || !db) {
+      throw new Error("Firebase is not configured. Cannot reset attendance.");
+    }
+
+    const snap = await getDocs(collection(db, "attendance"));
+    const matches = snap.docs.filter(d => d.data().sessionId === sessionId);
+    for (const m of matches) {
+      await deleteDoc(doc(db, "attendance", m.id));
+    }
+    return true;
   },
 
   // --- ATTENDANCE STATS CALCULATION ---
