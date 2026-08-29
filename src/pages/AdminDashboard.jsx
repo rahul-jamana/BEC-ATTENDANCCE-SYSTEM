@@ -88,6 +88,15 @@ export const AdminDashboard = () => {
   const [attError, setAttError] = useState("");
   const [attProcessing, setAttProcessing] = useState(false);
 
+  // Medical Relief / Attendance Override State
+  const [medStudentId, setMedStudentId] = useState("");
+  const [medTargetPct, setMedTargetPct] = useState("75");
+  const [medReason, setMedReason] = useState("Medical Grounds (Hospitalization / Certified Illness)");
+  const [medStudentStats, setMedStudentStats] = useState([]);
+  const [medLoading, setMedLoading] = useState(false);
+  const [medSuccess, setMedSuccess] = useState("");
+  const [medError, setMedError] = useState("");
+
   // Admin Edit User / Change Branch State
   const [adminEditingUser, setAdminEditingUser] = useState(null);
   const [isAdminEditModalOpen, setIsAdminEditModalOpen] = useState(false);
