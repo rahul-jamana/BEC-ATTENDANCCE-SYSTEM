@@ -172,12 +172,19 @@ export const Login = () => {
           </div>
 
           {/* Clean Institutional Security & Support Footer */}
-          <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+          <div className="mt-5 pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-500 gap-2">
             <div className="flex items-center space-x-1.5">
               <Shield className="w-3.5 h-3.5 text-blue-600" />
               <span className="font-semibold text-slate-600">BEC Secure Attendance</span>
             </div>
-            <span>BPUT Affiliated</span>
+            <a
+              href="https://www.ayushtechnologies.in/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
+            >
+              <span>Design &amp; Developed by Ayush Technologies</span>
+            </a>
           </div>
 
         </div>

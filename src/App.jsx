@@ -2,6 +2,7 @@ import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { Navbar } from "./components/Navbar";
+import { Footer } from "./components/Footer";
 import { Login } from "./pages/Login";
 import { Signup } from "./pages/Signup";
 import { StudentDashboard } from "./pages/StudentDashboard";
@@ -104,6 +105,7 @@ export default function App() {
               <Route path="*" element={<HomeRedirect />} />
             </Routes>
           </main>
+          <Footer />
         </div>
       </Router>
     </AuthProvider>
