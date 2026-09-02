@@ -763,9 +763,37 @@ export const DataService = {
   },
 
   async createUser(userData) {
+    if (!userData.uid) {
+      userData.uid = `user_${Date.now()}`;
+    }
+
+    const cleanUser = {
+      ...userData,
+      uid: String(userData.uid).trim(),
+      name: String(userData.name || "").trim(),
+      email: String(userData.email || "").trim().toLowerCase(),
+      rollNo: String(userData.rollNo || userData.tempId || "").trim().toUpperCase(),
+      tempId: String(userData.tempId || userData.rollNo || "").trim().toUpperCase(),
+      regNo: String(userData.regNo || "").trim().toUpperCase(),
+      branch: userData.branch || "CSE",
+      rawBranch: userData.rawBranch || userData.branch || "Computer Science Engineering",
+      year: userData.year || "1st",
+      section: userData.section || "A",
+      semester: userData.semester || "1",
+      dob: String(userData.dob || userData.password || "").trim(),
+      password: String(userData.password || userData.dob || "demo123").trim(),
+      role: userData.role || "student",
+      status: userData.status || "approved",
+      createdAt: userData.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
     if (isLiveFirebaseConfigured && db) {
-      await setDoc(doc(db, "users", userData.uid), userData);
-      return userData;
+      await setDoc(doc(db, "users", cleanUser.uid), cleanUser, { merge: true });
+      try {
+        await deleteDoc(doc(db, "deleted_users", cleanUser.uid));
+      } catch (e) {}
+      return cleanUser;
     }
     throw new Error("Firebase is not configured. Cannot create user.");
   },

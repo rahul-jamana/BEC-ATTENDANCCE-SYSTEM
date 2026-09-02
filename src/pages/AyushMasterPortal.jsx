@@ -180,29 +180,17 @@ export const AyushMasterPortal = () => {
         throw new Error(`An account with email "${form.email}" already exists!`);
       }
 
-      // Try to register user in Firebase Auth so they can log in via email/password
-      let uid = `uid_${Date.now()}`;
-      if (isLiveFirebaseConfigured && auth) {
-        try {
-          const firebaseRes = await createUserWithEmailAndPassword(
-            auth,
-            form.email.trim().toLowerCase(),
-            form.password.trim()
-          );
-          uid = firebaseRes.user.uid;
-        } catch (firebaseErr) {
-          // If user already exists in Firebase Auth, that's fine — use generated uid
-          if (firebaseErr.code !== "auth/email-already-in-use") {
-            console.warn("Firebase Auth registration failed (will use Firestore-only login):", firebaseErr.message);
-          }
-        }
-      }
+      // Generate unique persistent UID
+      let uid = createRole === "student" 
+        ? `stud_${Date.now()}_${Math.floor(Math.random() * 1000)}`
+        : `user_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
       let newProfile = {
         uid,
         name: form.name.trim(),
         email: form.email.trim().toLowerCase(),
         password: form.password.trim(),
+        dob: form.dob || form.password.trim(),
         role: createRole,
         status: form.status || "approved",
         createdAt: new Date().toISOString()

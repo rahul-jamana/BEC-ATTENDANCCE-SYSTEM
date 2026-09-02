@@ -166,6 +166,104 @@ export const AdminDashboard = () => {
     }
   };
 
+  // Admin Add New User State
+  const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
+  const [addUserLoading, setAddUserLoading] = useState(false);
+  const [addUserMsg, setAddUserMsg] = useState("");
+  const [addUserError, setAddUserError] = useState("");
+  const [newUserForm, setNewUserForm] = useState({
+    role: "student",
+    name: "",
+    email: "",
+    password: "",
+    dob: "",
+    rollNo: "",
+    regNo: "",
+    branch: "CSE",
+    year: "1st",
+    section: "A",
+    semester: "1",
+    department: "CSE",
+    status: "approved"
+  });
+
+  const handleOpenAddUser = () => {
+    setNewUserForm({
+      role: "student",
+      name: "",
+      email: "",
+      password: "",
+      dob: "",
+      rollNo: "",
+      regNo: "",
+      branch: "CSE",
+      year: "1st",
+      section: "A",
+      semester: "1",
+      department: "CSE",
+      status: "approved"
+    });
+    setAddUserMsg("");
+    setAddUserError("");
+    setIsAddUserModalOpen(true);
+  };
+
+  const handleCreateNewUser = async (e) => {
+    e.preventDefault();
+    setAddUserLoading(true);
+    setAddUserMsg("");
+    setAddUserError("");
+
+    try {
+      if (!newUserForm.name.trim() || !newUserForm.email.trim()) {
+        throw new Error("Full Name and Email Address are required.");
+      }
+
+      const uid = newUserForm.role === "student" 
+        ? `stud_${Date.now()}_${Math.floor(Math.random() * 1000)}`
+        : `user_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+      const payload = {
+        uid,
+        name: newUserForm.name.trim(),
+        email: newUserForm.email.trim().toLowerCase(),
+        password: newUserForm.password.trim() || newUserForm.dob.trim() || "demo123",
+        dob: newUserForm.dob.trim() || newUserForm.password.trim() || "",
+        role: newUserForm.role,
+        status: newUserForm.status || "approved",
+        rollNo: (newUserForm.rollNo || "").trim().toUpperCase(),
+        tempId: (newUserForm.rollNo || "").trim().toUpperCase(),
+        regNo: (newUserForm.regNo || "").trim().toUpperCase(),
+        branch: newUserForm.branch,
+        rawBranch: newUserForm.branch === "CSE" ? "Computer Science Engineering" :
+                   newUserForm.branch === "Data Science" ? "CSE (Data Science)" :
+                   newUserForm.branch === "Mechanical" ? "Mechanical Engineering" :
+                   newUserForm.branch === "Mechatronics" ? "Mechatronics Engineering" :
+                   newUserForm.branch === "Agriculture" ? "Agriculture Engineering" :
+                   newUserForm.branch === "Civil" ? "Civil Engineering" :
+                   newUserForm.branch === "Electrical" ? "Electrical Engineering" :
+                   newUserForm.branch === "ECE" ? "Electronics & Communication" : newUserForm.branch,
+        year: newUserForm.year,
+        section: newUserForm.section,
+        semester: newUserForm.semester,
+        department: newUserForm.department || newUserForm.branch,
+        createdAt: new Date().toISOString()
+      };
+
+      await DataService.createUser(payload);
+      setAddUserMsg(`✅ User "${payload.name}" successfully created & saved to Firestore!`);
+      setTimeout(() => {
+        setIsAddUserModalOpen(false);
+        setAddUserMsg("");
+      }, 1200);
+      await loadAdminData();
+    } catch (err) {
+      setAddUserError(err.message || "Failed to create user.");
+    } finally {
+      setAddUserLoading(false);
+    }
+  };
+
   const loadAdminData = async () => {
     const allUsers = await DataService.getUsers();
     setUsers(allUsers);
@@ -1127,6 +1225,16 @@ export const AdminDashboard = () => {
                       </button>
                     )}
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={handleOpenAddUser}
+                    className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 flex items-center gap-1.5 cursor-pointer transition-all shrink-0 hover:scale-105"
+                    title="Add a new Student, Teacher, or Admin user directly to Firestore"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add User</span>
+                  </button>
                 </div>
 
                 {/* Student Sub-Filters (Branch, Year, Section) */}
@@ -3062,6 +3170,266 @@ export const AdminDashboard = () => {
                   >
                     <Save className="w-3.5 h-3.5" />
                     <span>{adminEditSaving ? "Saving..." : "Save Changes"}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================
+            ADMIN ADD NEW USER MODAL (Direct Cloud Firestore)
+            ======================================================== */}
+        {isAddUserModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in">
+            <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl border border-blue-100 max-h-[90vh] overflow-y-auto space-y-5">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold">
+                    <Plus className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-slate-900">Add New Institutional User</h3>
+                    <p className="text-xs text-slate-500">Creates user and saves immediately to Cloud Firestore</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsAddUserModalOpen(false)}
+                  className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {addUserMsg && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl font-bold flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-emerald-600" />
+                  <span>{addUserMsg}</span>
+                </div>
+              )}
+
+              {addUserError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl font-bold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-600" />
+                  <span>{addUserError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleCreateNewUser} className="space-y-4">
+                {/* User Role Selector */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Account Role
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {["student", "teacher", "admin"].map((r) => (
+                      <button
+                        type="button"
+                        key={r}
+                        onClick={() => setNewUserForm({ ...newUserForm, role: r })}
+                        className={`py-2 text-xs font-bold uppercase rounded-xl border transition-all cursor-pointer ${
+                          newUserForm.role === r
+                            ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                            : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                        }`}
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Full Name */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Ramesh Kumar"
+                    value={newUserForm.name}
+                    onChange={(e) => setNewUserForm({ ...newUserForm, name: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Institutional Email
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="e.g. rameshkumar@bec.ac.in"
+                    value={newUserForm.email}
+                    onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Student Specific Fields */}
+                {newUserForm.role === "student" && (
+                  <div className="p-4 bg-blue-50/60 rounded-2xl border border-blue-200/80 space-y-3">
+                    <span className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
+                      <GraduationCap className="w-4 h-4 text-blue-700" /> Academic &amp; Section Setup:
+                    </span>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                          Branch / Stream
+                        </label>
+                        <select
+                          value={newUserForm.branch}
+                          onChange={(e) => {
+                            const b = e.target.value;
+                            let sec = "A";
+                            if (b === "Data Science") sec = "B";
+                            else if (["Mechanical", "Mechatronics", "Agriculture"].includes(b)) sec = "C";
+                            else sec = "D";
+                            setNewUserForm({ ...newUserForm, branch: b, section: sec });
+                          }}
+                          className="w-full p-2.5 bg-white border border-blue-300 rounded-xl text-xs font-bold text-blue-900 focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="CSE">CSE (Computer Science)</option>
+                          <option value="Data Science">Data Science (CSE Data Science)</option>
+                          <option value="Mechanical">Mechanical Engineering</option>
+                          <option value="Mechatronics">Mechatronics Engineering</option>
+                          <option value="Agriculture">Agriculture Engineering</option>
+                          <option value="Civil">Civil Engineering</option>
+                          <option value="Electrical">Electrical Engineering</option>
+                          <option value="ECE">ECE (Electronics &amp; Comm)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                          Section
+                        </label>
+                        <select
+                          value={newUserForm.section}
+                          onChange={(e) => setNewUserForm({ ...newUserForm, section: e.target.value })}
+                          className="w-full p-2.5 bg-white border border-blue-300 rounded-xl text-xs font-bold text-blue-900 focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="A">Section A (CSE)</option>
+                          <option value="B">Section B (Data Science)</option>
+                          <option value="C">Section C (Mech / Mechatronics / Agri)</option>
+                          <option value="D">Section D (Civil / Electrical / ECE / Aero)</option>
+                          <option value="A+B Combine">A+B Combine (Joint CSE + DS)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Academic Year</label>
+                        <select
+                          value={newUserForm.year}
+                          onChange={(e) => setNewUserForm({ ...newUserForm, year: e.target.value })}
+                          className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold"
+                        >
+                          <option value="1st">1st Year</option>
+                          <option value="2nd">2nd Year</option>
+                          <option value="3rd">3rd Year</option>
+                          <option value="4th">4th Year</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Semester</label>
+                        <select
+                          value={newUserForm.semester}
+                          onChange={(e) => setNewUserForm({ ...newUserForm, semester: e.target.value })}
+                          className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold"
+                        >
+                          <option value="1">Semester 1</option>
+                          <option value="2">Semester 2</option>
+                          <option value="3">Semester 3</option>
+                          <option value="4">Semester 4</option>
+                          <option value="5">Semester 5</option>
+                          <option value="6">Semester 6</option>
+                          <option value="7">Semester 7</option>
+                          <option value="8">Semester 8</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                          Roll No / Temp ID
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. BEC26190"
+                          value={newUserForm.rollNo}
+                          onChange={(e) => setNewUserForm({ ...newUserForm, rollNo: e.target.value })}
+                          className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-blue-900"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                          BPUT Reg No (Permanent)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Optional (e.g. 2401297190)"
+                          value={newUserForm.regNo}
+                          onChange={(e) => setNewUserForm({ ...newUserForm, regNo: e.target.value })}
+                          className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-emerald-800"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Password & DOB */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                      Date of Birth (YYYY-MM-DD)
+                    </label>
+                    <input
+                      type="date"
+                      value={newUserForm.dob}
+                      onChange={(e) => setNewUserForm({ ...newUserForm, dob: e.target.value, password: e.target.value || newUserForm.password })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 cursor-pointer"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                      Login Password
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Password or DOB"
+                      value={newUserForm.password}
+                      onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-semibold text-blue-900"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-slate-100 flex items-center justify-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddUserModalOpen(false)}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={addUserLoading}
+                    className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-colors shadow-md shadow-blue-500/20 cursor-pointer inline-flex items-center gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{addUserLoading ? "Creating..." : "Create User"}</span>
                   </button>
                 </div>
               </form>

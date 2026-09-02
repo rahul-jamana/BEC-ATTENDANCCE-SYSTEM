@@ -56,25 +56,34 @@ export const AuthProvider = ({ children }) => {
     return unsubscribe;
   }, []);
 
-  // Signup — creates Firebase Auth account + Firestore profile
+  // Signup — creates Firestore profile + optional Firebase Auth account
   const signupStudent = async (studentData) => {
-    const res = await createUserWithEmailAndPassword(
-      auth,
-      studentData.email.trim(),
-      studentData.password
-    );
-    const uid = res.user.uid;
+    let uid = `stud_${Date.now()}`;
+    if (isLiveFirebaseConfigured && auth) {
+      try {
+        const res = await createUserWithEmailAndPassword(
+          auth,
+          studentData.email.trim().toLowerCase(),
+          studentData.password
+        );
+        uid = res.user.uid;
+      } catch (authErr) {
+        console.warn("Firebase Auth account creation notice:", authErr.message);
+      }
+    }
 
     const newProfile = {
       uid,
-      name: studentData.name,
+      name: studentData.name.trim(),
       rollNo: (studentData.rollNo || "").trim().toUpperCase(),
+      tempId: (studentData.rollNo || "").trim().toUpperCase(),
       email: studentData.email.trim().toLowerCase(),
-      password: studentData.password,
-      branch: studentData.branch,
-      year: studentData.year,
-      section: studentData.section,
-      semester: studentData.semester,
+      password: studentData.password || studentData.dob || "demo123",
+      branch: studentData.branch || "CSE",
+      rawBranch: studentData.branch || "Computer Science Engineering",
+      year: studentData.year || "1st",
+      section: studentData.section || "A",
+      semester: studentData.semester || "1",
       dob: studentData.dob || "",
       gender: studentData.gender || "Male",
       phone: studentData.phone || "",
@@ -83,63 +92,32 @@ export const AuthProvider = ({ children }) => {
       createdAt: new Date().toISOString()
     };
 
-    await DataService.createUser(newProfile);
-    setCurrentUser(newProfile);
-    setUserProfile(newProfile);
-    localStorage.setItem("bec_session_user", JSON.stringify(newProfile));
-    return newProfile;
+    const saved = await DataService.createUser(newProfile);
+    setCurrentUser(saved);
+    setUserProfile(saved);
+    localStorage.setItem("bec_session_user", JSON.stringify(saved));
+    return saved;
   };
 
   // Universal Login (Accepts Email, Temporary Roll Number, or Registration Number)
   const login = async (identifier, password) => {
     const trimmedId = (identifier || "").trim().toLowerCase();
-    const isEmail = trimmedId.includes("@");
-
-    // STEP 1: Try Firebase Auth first (email login)
-    if (isEmail && isLiveFirebaseConfigured && auth) {
-      try {
-        const firebaseResult = await signInWithEmailAndPassword(auth, trimmedId, password);
-        // Fetch profile from Firestore (auth token now valid)
-        const profile = await DataService.getUserById(firebaseResult.user.uid);
-        if (profile) {
-          setCurrentUser(firebaseResult.user);
-          setUserProfile(profile);
-          localStorage.setItem("bec_session_user", JSON.stringify(profile));
-          return profile;
-        }
-        // Signed in but no Firestore profile found
-        await signOut(auth);
-        throw new Error("No account profile found. Please contact admin.");
-      } catch (firebaseErr) {
-        const code = firebaseErr.code || "";
-        if (
-          code === "auth/wrong-password" ||
-          code === "auth/invalid-credential" ||
-          code === "auth/invalid-password"
-        ) {
-          // Fall through to check local student DB / DOB credentials
-        } else if (code === "auth/user-not-found" || code === "auth/invalid-email") {
-          // Fall through to database lookup
-        } else if (!code) {
-          throw firebaseErr;
-        }
-        console.warn("Firebase Auth bypassed, checking Firestore & student roster:", firebaseErr.message);
-      }
-    }
-
-    // STEP 2: Universal Database Lookup (Email, Roll No, Temp ID, or Registration Number)
-    const allUsers = await DataService.getUsers();
     const cleanInput = trimmedId.replace(/[\s-_]/g, "");
 
+    // STEP 1: Universal Database Lookup (Email, Roll No, Temp ID, Reg No, or UID)
+    const allUsers = await DataService.getUsers();
+
     const userFromDb = allUsers.find(u => {
-      const uEmail = (u.email || "").toLowerCase();
+      const uEmail = (u.email || "").toLowerCase().trim();
       const uRoll = (u.rollNo || "").toLowerCase().replace(/[\s-_]/g, "");
       const uTemp = (u.tempId || "").toLowerCase().replace(/[\s-_]/g, "");
       const uReg = (u.regNo || "").toLowerCase().replace(/[\s-_]/g, "");
+      const uUid = (u.uid || "").toLowerCase().trim();
       return (
         uEmail === trimmedId ||
         uRoll === cleanInput ||
         uTemp === cleanInput ||
+        uUid === trimmedId ||
         (uReg && uReg === cleanInput)
       );
     });
@@ -148,7 +126,7 @@ export const AuthProvider = ({ children }) => {
       throw new Error("Invalid credentials: No account found with this Email, Student ID, or Roll Number.");
     }
 
-    // STEP 3: Flexible Password & DOB Verification
+    // STEP 2: Flexible Password & DOB Verification
     const cleanPassword = (password || "").trim();
     const userPass = (userFromDb.password || "").trim();
     const userDob = (userFromDb.dob || "").trim();
@@ -163,7 +141,16 @@ export const AuthProvider = ({ children }) => {
       (userPass && normalizeDateDigits(userPass) === normalizeDateDigits(cleanPassword));
 
     if (!isPasswordValid) {
-      throw new Error("Incorrect password. Please enter your Date of Birth (e.g. YYYY-MM-DD or DD-MM-YYYY) or assigned password.");
+      throw new Error("Incorrect password. Please enter your Date of Birth (e.g. YYYY-MM-DD) or assigned password.");
+    }
+
+    // Optional background sync with Firebase Auth
+    if (userFromDb.email && isLiveFirebaseConfigured && auth) {
+      try {
+        await signInWithEmailAndPassword(auth, userFromDb.email.toLowerCase(), cleanPassword);
+      } catch (e) {
+        // Non-blocking
+      }
     }
 
     setCurrentUser(userFromDb);
