@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Html5Qrcode } from "html5-qrcode";
-import { X, Camera, AlertTriangle, CheckCircle2, ShieldCheck, QrCode, RefreshCw, ArrowRight } from "lucide-react";
+import { X, Camera, AlertTriangle, CheckCircle2, ShieldCheck, QrCode, RefreshCw, ArrowRight, Video } from "lucide-react";
 import { DataService } from "../services/dataService";
 import { uploadPhotoToCloudinary } from "../services/cloudinaryService";
 
@@ -44,35 +44,64 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
   }, [isOpen]);
 
   // -------------------------------------------------------------
-  // STEP 1: SELFIE CAMERA LOGIC
+  // STEP 1: SELFIE CAMERA LOGIC (iOS / Safari Compatible)
   // -------------------------------------------------------------
   const startSelfieCamera = async () => {
     stopSelfieCamera();
     setErrorMsg("");
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" }
-      });
+      // Standard constraints with fallback for iOS WebKit
+      let stream = null;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: "user",
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+          },
+          audio: false
+        });
+      } catch (err) {
+        // Fallback for older iOS Safari without ideal constraints
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false
+        });
+      }
+
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        videoRef.current.setAttribute("playsinline", "true");
+        videoRef.current.setAttribute("webkit-playsinline", "true");
+        videoRef.current.muted = true;
+        try {
+          await videoRef.current.play();
+        } catch (e) {
+          console.warn("Selfie video play error:", e);
+        }
         setIsSelfieCameraActive(true);
       }
     } catch (err) {
       console.warn("Student selfie camera error:", err);
-      setErrorMsg("Front camera access required to capture live photo. Please enable camera permissions.");
+      setErrorMsg("Front camera access is required. On iPhone/iOS, please ensure camera permissions are allowed in Safari settings.");
       setIsSelfieCameraActive(false);
     }
   };
 
   const stopSelfieCamera = () => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      try {
+        streamRef.current.getTracks().forEach(track => {
+          track.stop();
+        });
+      } catch (e) {}
       streamRef.current = null;
     }
     if (videoRef.current) {
-      videoRef.current.srcObject = null;
+      try {
+        videoRef.current.srcObject = null;
+      } catch (e) {}
     }
     setIsSelfieCameraActive(false);
   };
@@ -85,6 +114,10 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
     canvas.width = video.videoWidth || 640;
     canvas.height = video.videoHeight || 480;
     const ctx = canvas.getContext("2d");
+    
+    // Draw mirrored selfie
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
@@ -100,11 +133,14 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
   const proceedToQRScan = () => {
     if (!selfieDataUrl) return;
     stopSelfieCamera();
-    setStep("qr");
+    // 300ms transition delay to ensure iOS hardware camera teardown completes
+    setTimeout(() => {
+      setStep("qr");
+    }, 300);
   };
 
   // -------------------------------------------------------------
-  // STEP 2: QR CODE SCANNER LOGIC
+  // STEP 2: QR CODE SCANNER LOGIC (iOS / Safari Compatible)
   // -------------------------------------------------------------
   useEffect(() => {
     let html5QrCode = null;
@@ -116,33 +152,82 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
           const element = document.getElementById("qr-reader-target");
           if (!element || !isMounted) return;
 
-          html5QrCode = new Html5Qrcode("qr-reader-target");
+          // Stop any previous instance
+          if (qrScannerRef.current) {
+            try { await qrScannerRef.current.stop(); } catch (e) {}
+          }
+
+          html5QrCode = new Html5Qrcode("qr-reader-target", {
+            verbose: false,
+            experimentalFeatures: {
+              useBarCodeDetectorIfSupported: true // Ultra-fast hardware barcode detector on iOS 17+
+            }
+          });
           qrScannerRef.current = html5QrCode;
 
-          const config = { fps: 10, qrbox: { width: 220, height: 220 } };
+          const config = {
+            fps: 15,
+            qrbox: (viewfinderWidth, viewfinderHeight) => {
+              const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+              const edgeSize = Math.max(180, Math.floor(minEdge * 0.75));
+              return { width: edgeSize, height: edgeSize };
+            },
+            aspectRatio: 1.0
+          };
 
           const onScanSuccess = (decodedText) => {
+            if (navigator.vibrate) {
+              try { navigator.vibrate(100); } catch (e) {}
+            }
             handleQRScanned(decodedText, html5QrCode);
           };
 
-          // Try back camera first, fallback to user facing
+          // Try back/environment camera first with iOS WebKit constraints
           try {
-            await html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess, () => {});
-            if (isMounted) setIsQrScannerActive(true);
+            await html5QrCode.start(
+              { facingMode: "environment" },
+              config,
+              onScanSuccess,
+              () => {}
+            );
+            if (isMounted) {
+              setIsQrScannerActive(true);
+              ensureVideoInline();
+            }
           } catch (backErr) {
-            console.warn("Back camera failed, trying front camera:", backErr);
+            console.warn("Back camera failed on iOS, trying camera enumeration or user camera:", backErr);
             try {
-              await html5QrCode.start({ facingMode: "user" }, config, onScanSuccess, () => {});
-              if (isMounted) setIsQrScannerActive(true);
+              const cameras = await Html5Qrcode.getCameras();
+              if (cameras && cameras.length > 0) {
+                const selectedCam = cameras[cameras.length - 1]; // Often back camera is last
+                await html5QrCode.start(
+                  selectedCam.id,
+                  config,
+                  onScanSuccess,
+                  () => {}
+                );
+                if (isMounted) {
+                  setIsQrScannerActive(true);
+                  ensureVideoInline();
+                }
+              } else {
+                await html5QrCode.start({ facingMode: "user" }, config, onScanSuccess, () => {});
+                if (isMounted) {
+                  setIsQrScannerActive(true);
+                  ensureVideoInline();
+                }
+              }
             } catch (err) {
-              console.warn("QR Camera error:", err);
-              if (isMounted) setErrorMsg("Camera error while scanning QR code. Please ensure camera permissions are allowed.");
+              console.warn("All QR Camera attempts failed on iOS:", err);
+              if (isMounted) {
+                setErrorMsg("Camera error on iPhone/iOS. Please ensure camera permissions are allowed in Safari settings, or ask your faculty for manual attendance.");
+              }
             }
           }
         } catch (e) {
           console.warn("Html5Qrcode init error:", e);
         }
-      }, 400);
+      }, 500);
 
       return () => {
         isMounted = false;
@@ -152,17 +237,28 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
     }
   }, [isOpen, step]);
 
+  const ensureVideoInline = () => {
+    setTimeout(() => {
+      const videoEl = document.querySelector("#qr-reader-target video");
+      if (videoEl) {
+        videoEl.setAttribute("playsinline", "true");
+        videoEl.setAttribute("webkit-playsinline", "true");
+        videoEl.muted = true;
+      }
+    }, 200);
+  };
+
   const stopQrScanner = () => {
     if (qrScannerRef.current) {
       try {
         qrScannerRef.current
           .stop()
           .then(() => {
-            qrScannerRef.current?.clear();
+            try { qrScannerRef.current?.clear(); } catch (e) {}
             qrScannerRef.current = null;
           })
           .catch(() => {
-            qrScannerRef.current?.clear();
+            try { qrScannerRef.current?.clear(); } catch (e) {}
             qrScannerRef.current = null;
           });
       } catch (e) {}
@@ -172,9 +268,31 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
 
   const handleQRScanned = async (decodedText, qrInstance) => {
     try {
-      const data = JSON.parse(decodedText);
-      if (!data.sessionId || !data.token) {
-        throw new Error("Unrecognized QR Code format.");
+      let data = null;
+      const cleanText = (decodedText || "").trim();
+
+      // Case 1: Raw JSON string
+      if (cleanText.startsWith("{") && cleanText.endsWith("}")) {
+        data = JSON.parse(cleanText);
+      } 
+      // Case 2: URL with encoded query parameters
+      else if (cleanText.includes("sessionId=") || cleanText.includes("token=")) {
+        const urlParams = new URLSearchParams(cleanText.includes("?") ? cleanText.split("?")[1] : cleanText);
+        data = {
+          sessionId: urlParams.get("sessionId"),
+          token: urlParams.get("token"),
+          branch: urlParams.get("branch"),
+          year: urlParams.get("year"),
+          section: urlParams.get("section"),
+          semester: urlParams.get("semester"),
+          subjectId: urlParams.get("subjectId")
+        };
+      } else {
+        throw new Error("Unrecognized QR Code format. Please scan the official BEC Projector QR.");
+      }
+
+      if (!data?.sessionId || !data?.token) {
+        throw new Error("Incomplete QR Code data. Please scan the active projector screen.");
       }
 
       if (qrInstance) {
@@ -263,7 +381,7 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
             </div>
             <div>
               <h3 className="font-extrabold text-sm sm:text-base leading-tight">Live Student QR Verification</h3>
-              <p className="text-[11px] text-sky-200">2-Step Anti-Proxy Camera Scanner</p>
+              <p className="text-[11px] text-sky-200">iOS &amp; Android Anti-Proxy Camera Scanner</p>
             </div>
           </div>
           <button
@@ -364,7 +482,7 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
                       playsInline 
                       webkit-playsinline="true" 
                       muted 
-                      className="w-full h-full object-cover" 
+                      className="w-full h-full object-cover transform -scale-x-100" 
                     />
                     {isSelfieCameraActive && (
                       <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
@@ -412,7 +530,7 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
           )}
 
           {/* -------------------------------------------------------------
-              STEP 2 VIEW: SCAN CLASSROOM QR CODE
+              STEP 2 VIEW: SCAN CLASSROOM QR CODE (iOS WebKit Optimized)
               ------------------------------------------------------------- */}
           {step === "qr" && (
             <div className="space-y-4">
@@ -433,7 +551,7 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
                 {isProcessing && (
                   <div className="absolute inset-0 bg-slate-900/85 backdrop-blur-xs flex items-center justify-center text-white space-x-2 z-20">
                     <div className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
-                    <span className="text-xs sm:text-sm font-bold">Verifying Live Photo &amp; Token...</span>
+                    <span className="text-xs sm:text-sm font-bold">Verifying Attendance &amp; Token...</span>
                   </div>
                 )}
               </div>
