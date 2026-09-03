@@ -54,6 +54,7 @@ export const ProjectorQRModal = ({ isOpen, onClose, session, onEndSession }) => 
     branch: session.branch,
     year: session.year,
     section: session.section,
+    combinedSections: session.combinedSections || [],
     semester: session.semester,
     subjectId: session.subjectId,
     token: token

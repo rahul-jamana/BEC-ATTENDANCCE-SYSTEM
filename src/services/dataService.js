@@ -12,7 +12,12 @@ const DEFAULT_DEPARTMENTS = [
   "Agriculture", "Biotechnology", "Chemical", "Mining", "Automobile", "EIE"
 ];
 const DEFAULT_YEARS = ["1st", "2nd", "3rd", "4th"];
-const DEFAULT_SECTIONS = ["A", "B", "C", "D", "A+B Combine"];
+const DEFAULT_SECTIONS = [
+  "A", "B", "C", "D",
+  "A+B Combine", "A+C Combine", "A+D Combine",
+  "B+C Combine", "B+D Combine", "C+D Combine",
+  "A+B+C Combine", "All Sections Combine"
+];
 const DEFAULT_SEMESTERS = ["1", "2", "3", "4", "5", "6", "7", "8"];
 
 // ──────────────────────────────────────────────────────────────
@@ -956,11 +961,22 @@ export const DataService = {
     const studentSection = normalizeStr(student?.section);
     const sessionSection = normalizeStr(session?.section);
 
+    // Determine all allowed sections
+    let allowedSections = [];
+    if (Array.isArray(session?.combinedSections) && session.combinedSections.length > 0) {
+      allowedSections = session.combinedSections.map(normalizeStr);
+    } else if (sessionSection.includes("all")) {
+      allowedSections = ["a", "b", "c", "d"];
+    } else if (sessionSection.includes("combine") || sessionSection.includes("+")) {
+      ["a", "b", "c", "d"].forEach(letter => {
+        if (sessionSection.includes(letter)) allowedSections.push(letter);
+      });
+    }
+
     const isCombinedSession = 
-      sessionSection.includes("ab") || 
+      allowedSections.length > 1 || 
       sessionSection.includes("combine") || 
-      session?.isCombined ||
-      (Array.isArray(session?.combinedSections) && session.combinedSections.some(s => normalizeStr(s) === studentSection));
+      session?.isCombined;
 
     // Year check
     if (studentYear && sessionYear && studentYear !== sessionYear) {
@@ -971,11 +987,10 @@ export const DataService = {
 
     // Section & Branch verification
     if (isCombinedSession) {
-      // Default A+B combine allows Section A (CSE) and Section B (Data Science)
-      const allowedSections = session?.combinedSections?.map(normalizeStr) || ["a", "b"];
+      if (allowedSections.length === 0) allowedSections = ["a", "b"];
       if (!allowedSections.includes(studentSection) && studentSection) {
         throw new Error(
-          `This combined session is for Sections ${allowedSections.map(s => s.toUpperCase()).join(" & ")}! (Your section is ${student.section || "Unknown"})`
+          `This combined session is for Sections ${allowedSections.map(s => s.toUpperCase()).join(" & ")}! (Your roster is registered as Section ${student.section?.toUpperCase() || "Unknown"})`
         );
       }
     } else {

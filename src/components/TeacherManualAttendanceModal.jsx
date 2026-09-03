@@ -16,10 +16,23 @@ export const TeacherManualAttendanceModal = ({ isOpen, onClose, session, onAtten
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [successToast, setSuccessToast] = useState("");
 
-  const isCombinedSession = 
-    session?.section?.toLowerCase().includes("ab") || 
-    session?.section?.toLowerCase().includes("combine") || 
-    session?.isCombined;
+  const normalizeStr = (v) => String(v || "").trim().toLowerCase().replace(/[\s-_+]/g, "");
+
+  // Extract all section letters if combined (e.g. A+D, A+C, A+B, etc.)
+  const sessionSection = normalizeStr(session?.section);
+  let allowedSections = [];
+  if (Array.isArray(session?.combinedSections) && session.combinedSections.length > 0) {
+    allowedSections = session.combinedSections.map(normalizeStr);
+  } else if (sessionSection.includes("all")) {
+    allowedSections = ["a", "b", "c", "d"];
+  } else if (sessionSection.includes("combine") || sessionSection.includes("+")) {
+    ["a", "b", "c", "d"].forEach(letter => {
+      if (sessionSection.includes(letter)) allowedSections.push(letter);
+    });
+  }
+
+  const isCombinedSession = allowedSections.length > 1 || sessionSection.includes("combine") || session?.isCombined;
+  if (isCombinedSession && allowedSections.length === 0) allowedSections = ["a", "b"];
 
   const loadData = async () => {
     if (!session) return;
@@ -28,10 +41,8 @@ export const TeacherManualAttendanceModal = ({ isOpen, onClose, session, onAtten
       const allUsers = await DataService.getUsers();
       const allAtt = await DataService.getAttendance();
 
-      const normalizeStr = (v) => String(v || "").trim().toLowerCase().replace(/[\s-_+]/g, "");
       const sessionYear = normalizeStr(session.year);
       const sessionBranch = normalizeStr(session.branch);
-      const sessionSection = normalizeStr(session.section);
 
       // Filter matching students
       const enrolled = allUsers.filter(u => {
@@ -43,8 +54,7 @@ export const TeacherManualAttendanceModal = ({ isOpen, onClose, session, onAtten
         if (sessionYear && uYear && sessionYear !== uYear) return false;
 
         if (isCombinedSession) {
-          // In A+B combine, include Section A and Section B
-          return uSec === "a" || uSec === "b";
+          return allowedSections.includes(uSec);
         }
 
         const secMatch = !sessionSection || uSec === sessionSection;
@@ -364,9 +374,17 @@ export const TeacherManualAttendanceModal = ({ isOpen, onClose, session, onAtten
                 onChange={(e) => setSelectedSectionFilter(e.target.value)}
                 className="text-xs font-semibold px-3 py-2 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 cursor-pointer"
               >
-                <option value="all">All Sections (A &amp; B)</option>
-                <option value="a">Section A (CSE)</option>
-                <option value="b">Section B (Data Science)</option>
+                <option value="all">All Combined Sections ({allowedSections.map(s => s.toUpperCase()).join(" + ")})</option>
+                {allowedSections.map((s) => (
+                  <option key={s} value={s}>
+                    Section {s.toUpperCase()} ({
+                      s === "a" ? "CSE" : 
+                      s === "b" ? "Data Science" : 
+                      s === "c" ? "Mech / Agri" : 
+                      s === "d" ? "Civil / EE / ECE" : s.toUpperCase()
+                    })
+                  </option>
+                ))}
               </select>
             )}
           </div>
