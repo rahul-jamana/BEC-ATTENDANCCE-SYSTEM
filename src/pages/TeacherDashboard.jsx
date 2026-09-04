@@ -347,11 +347,12 @@ export const TeacherDashboard = () => {
           </div>
 
           <form onSubmit={handleInitiateSession} className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
+            {/* Row 1: Academic Stream & Subject */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               
               {/* Branch */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Branch</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">1. Branch</label>
                 <select
                   value={classForm.branch}
                   onChange={(e) => setClassForm({ ...classForm, branch: e.target.value, subjectId: "" })}
@@ -363,7 +364,7 @@ export const TeacherDashboard = () => {
 
               {/* Year */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Year</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">2. Academic Year</label>
                 <select
                   value={classForm.year}
                   onChange={(e) => {
@@ -382,132 +383,9 @@ export const TeacherDashboard = () => {
                 </select>
               </div>
 
-              {/* Section & Dynamic Combiner */}
-              <div className="sm:col-span-2 bg-blue-50/50 p-3 rounded-2xl border border-blue-200/70 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-bold text-blue-950 uppercase tracking-wider">
-                    Class Section Mode
-                  </label>
-                  <div className="flex items-center space-x-1 bg-white p-0.5 rounded-lg border border-blue-200">
-                    <button
-                      type="button"
-                      onClick={() => setIsCombineMode(false)}
-                      className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-all cursor-pointer ${
-                        !isCombineMode
-                          ? "bg-blue-600 text-white shadow-xs"
-                          : "text-slate-600 hover:text-slate-900"
-                      }`}
-                    >
-                      Single Section
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsCombineMode(true)}
-                      className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-all cursor-pointer flex items-center gap-1 ${
-                        isCombineMode
-                          ? "bg-indigo-600 text-white shadow-xs"
-                          : "text-slate-600 hover:text-slate-900"
-                      }`}
-                    >
-                      <span>🔀 Combine Sections</span>
-                    </button>
-                  </div>
-                </div>
-
-                {!isCombineMode ? (
-                  <div>
-                    <select
-                      value={classForm.section}
-                      onChange={(e) => setClassForm({ ...classForm, section: e.target.value })}
-                      className="w-full p-2.5 bg-white border border-blue-200 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-xs"
-                    >
-                      <option value="A">Section A (CSE)</option>
-                      <option value="B">Section B (Data Science)</option>
-                      <option value="C">Section C (Mech / Mechatronics / Agri)</option>
-                      <option value="D">Section D (Civil / Electrical / ECE / Aero)</option>
-                      <option value="A+B Combine">A+B Combine (CSE + Data Science)</option>
-                      <option value="A+D Combine">A+D Combine (CSE + Civil/EE/ECE)</option>
-                      <option value="A+C Combine">A+C Combine (CSE + Mech/Agri)</option>
-                      <option value="B+D Combine">B+D Combine (Data Science + Civil/EE/ECE)</option>
-                      <option value="C+D Combine">C+D Combine (Mech + Civil/EE/ECE)</option>
-                      <option value="All Sections Combine">All Sections Combine (A+B+C+D)</option>
-                    </select>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {/* Custom Combined Checkboxes */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      {[
-                        { id: "A", name: "Sec A", desc: "CSE" },
-                        { id: "B", name: "Sec B", desc: "Data Science" },
-                        { id: "C", name: "Sec C", desc: "Mech/Agri" },
-                        { id: "D", name: "Sec D", desc: "Civil/EE/ECE" }
-                      ].map((sec) => {
-                        const isSelected = selectedCombineSections.includes(sec.id);
-                        return (
-                          <button
-                            type="button"
-                            key={sec.id}
-                            onClick={() => {
-                              if (isSelected) {
-                                if (selectedCombineSections.length > 1) {
-                                  setSelectedCombineSections(selectedCombineSections.filter(s => s !== sec.id));
-                                }
-                              } else {
-                                setSelectedCombineSections([...selectedCombineSections, sec.id].sort());
-                              }
-                            }}
-                            className={`p-2 rounded-xl border text-left transition-all cursor-pointer ${
-                              isSelected
-                                ? "bg-blue-600 text-white border-blue-700 shadow-sm"
-                                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="font-bold text-xs">{sec.name}</span>
-                              <span className="text-[10px] opacity-80">{isSelected ? "✓" : "+"}</span>
-                            </div>
-                            <span className={`text-[10px] block truncate ${isSelected ? "text-blue-100" : "text-slate-400"}`}>
-                              {sec.desc}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Quick Preset Buttons */}
-                    <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[11px]">
-                      <span className="text-slate-500 font-bold">Presets:</span>
-                      {[
-                        { label: "A + D", sections: ["A", "D"] },
-                        { label: "A + C", sections: ["A", "C"] },
-                        { label: "A + B", sections: ["A", "B"] },
-                        { label: "B + D", sections: ["B", "D"] },
-                        { label: "C + D", sections: ["C", "D"] },
-                        { label: "All (A+B+C+D)", sections: ["A", "B", "C", "D"] }
-                      ].map((preset) => (
-                        <button
-                          type="button"
-                          key={preset.label}
-                          onClick={() => setSelectedCombineSections(preset.sections)}
-                          className="px-2 py-0.5 bg-white hover:bg-blue-100 text-blue-900 border border-blue-200 rounded-md font-semibold cursor-pointer transition-colors shadow-2xs"
-                        >
-                          {preset.label}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="bg-emerald-50 text-emerald-900 border border-emerald-200 px-3 py-1.5 rounded-xl font-bold text-[11px] flex items-center justify-between">
-                      <span>Combined: Section {selectedCombineSections.sort().join(" + Section ")}</span>
-                      <span className="text-[10px] bg-emerald-600 text-white px-2 py-0.5 rounded-full">Active</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
               {/* Semester */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Semester</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">3. Semester</label>
                 <select
                   value={classForm.semester}
                   onChange={(e) => setClassForm({ ...classForm, semester: e.target.value, subjectId: "" })}
@@ -517,9 +395,9 @@ export const TeacherDashboard = () => {
                 </select>
               </div>
 
-              {/* Subject (Integrated with full BPUT Curriculum) */}
+              {/* Subject */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">BPUT Subject</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">4. BPUT Subject</label>
                 <select
                   value={classForm.subjectId}
                   onChange={(e) => setClassForm({ ...classForm, subjectId: e.target.value })}
@@ -539,6 +417,152 @@ export const TeacherDashboard = () => {
                 </select>
               </div>
 
+            </div>
+
+            {/* Row 2: Section & Multi-Section Combiner (Dedicated Full-Width Panel) */}
+            <div className="bg-gradient-to-br from-blue-50/80 via-indigo-50/40 to-slate-50 p-4 sm:p-5 rounded-3xl border border-blue-200 shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-blue-100 pb-3">
+                <div>
+                  <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-1.5">
+                    <span>5. Classroom Section Selection</span>
+                  </h3>
+                  <p className="text-[11px] text-slate-500">Choose single section or combine multiple sections (e.g. Section A + Section D)</p>
+                </div>
+
+                <div className="flex items-center space-x-1.5 bg-white p-1 rounded-xl border border-blue-200 shadow-xs">
+                  <button
+                    type="button"
+                    onClick={() => setIsCombineMode(false)}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                      !isCombineMode
+                        ? "bg-blue-600 text-white shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    Single Section
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsCombineMode(true)}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                      isCombineMode
+                        ? "bg-indigo-600 text-white shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    <span>🔀 Combine Sections</span>
+                  </button>
+                </div>
+              </div>
+
+              {!isCombineMode ? (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { id: "A", name: "Section A", desc: "CSE (Computer Science)" },
+                    { id: "B", name: "Section B", desc: "Data Science" },
+                    { id: "C", name: "Section C", desc: "Mech / Mechatronics / Agri" },
+                    { id: "D", name: "Section D", desc: "Civil / EE / ECE / Aero" }
+                  ].map((sec) => (
+                    <button
+                      type="button"
+                      key={sec.id}
+                      onClick={() => setClassForm({ ...classForm, section: sec.id })}
+                      className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                        classForm.section === sec.id
+                          ? "bg-blue-600 text-white border-blue-700 shadow-md scale-[1.02]"
+                          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className="font-extrabold text-sm">{sec.name}</div>
+                      <div className={`text-[10px] truncate mt-0.5 ${classForm.section === sec.id ? "text-blue-100" : "text-slate-400"}`}>
+                        {sec.desc}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-3.5">
+                  {/* Custom Checkboxes */}
+                  <div>
+                    <span className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                      Select Any Sections to Combine Together:
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {[
+                        { id: "A", name: "Section A", desc: "CSE" },
+                        { id: "B", name: "Section B", desc: "Data Science" },
+                        { id: "C", name: "Section C", desc: "Mech / Agri" },
+                        { id: "D", name: "Section D", desc: "Civil / EE / ECE" }
+                      ].map((sec) => {
+                        const isSelected = selectedCombineSections.includes(sec.id);
+                        return (
+                          <button
+                            type="button"
+                            key={sec.id}
+                            onClick={() => {
+                              if (isSelected) {
+                                if (selectedCombineSections.length > 1) {
+                                  setSelectedCombineSections(selectedCombineSections.filter(s => s !== sec.id));
+                                }
+                              } else {
+                                setSelectedCombineSections([...selectedCombineSections, sec.id].sort());
+                              }
+                            }}
+                            className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                              isSelected
+                                ? "bg-indigo-600 text-white border-indigo-700 shadow-md scale-[1.02]"
+                                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-extrabold text-sm">{sec.name}</span>
+                              <span className={`text-xs px-1.5 py-0.5 rounded-md font-mono ${isSelected ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"}`}>
+                                {isSelected ? "✓ Included" : "+ Add"}
+                              </span>
+                            </div>
+                            <span className={`text-[10px] block truncate mt-1 ${isSelected ? "text-indigo-100" : "text-slate-400"}`}>
+                              {sec.desc}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Preset Quick Chips */}
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs pt-1">
+                    <span className="text-slate-500 font-bold mr-1">Quick Presets:</span>
+                    {[
+                      { label: "A + D Combine", sections: ["A", "D"] },
+                      { label: "A + C Combine", sections: ["A", "C"] },
+                      { label: "A + B Combine", sections: ["A", "B"] },
+                      { label: "B + D Combine", sections: ["B", "D"] },
+                      { label: "C + D Combine", sections: ["C", "D"] },
+                      { label: "All Sections (A+B+C+D)", sections: ["A", "B", "C", "D"] }
+                    ].map((preset) => (
+                      <button
+                        type="button"
+                        key={preset.label}
+                        onClick={() => setSelectedCombineSections(preset.sections)}
+                        className="px-2.5 py-1 bg-white hover:bg-indigo-50 text-indigo-900 border border-indigo-200 rounded-lg font-bold cursor-pointer transition-colors shadow-2xs text-[11px]"
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Active Notice Banner */}
+                  <div className="bg-emerald-50 text-emerald-900 border border-emerald-300 p-3 rounded-2xl font-bold text-xs flex items-center justify-between shadow-2xs">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">🎉</span>
+                      <span>Combined Class Active: Students from <strong>Section {selectedCombineSections.sort().join(" + Section ")}</strong> can scan and mark attendance!</span>
+                    </div>
+                    <span className="text-[10px] bg-emerald-600 text-white px-2.5 py-1 rounded-full uppercase tracking-wider font-extrabold shrink-0">
+                      Ready
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end">
