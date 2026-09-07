@@ -2,17 +2,17 @@ import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
-// User's Live Firebase Project credentials (bec-at-system)
+// Live Firebase Project configuration from environment variables (.env)
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyC8-xW8PG4xDf-UI9pBH0jMwrWIIfk2mUQ",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "bec-at-system.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "bec-at-system",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "bec-at-system.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "5275309105",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:5275309105:web:051261270458c3695bb110"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-// Check if valid API Key is provided
+// Check if valid API Key is provided in environment
 export const isLiveFirebaseConfigured = Boolean(
   firebaseConfig.apiKey && 
   !firebaseConfig.apiKey.includes("DemoConfigKey")
