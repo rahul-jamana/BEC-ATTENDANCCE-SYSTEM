@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Html5Qrcode } from "html5-qrcode";
-import { X, Camera, AlertTriangle, CheckCircle2, ShieldCheck, QrCode, RefreshCw, ArrowRight, ExternalLink } from "lucide-react";
+import jsQR from "jsqr";
+import { X, Camera, AlertTriangle, CheckCircle2, ShieldCheck, QrCode, RefreshCw, ArrowRight, ExternalLink, SwitchCamera } from "lucide-react";
 import { DataService } from "../services/dataService";
 import { uploadPhotoToCloudinary } from "../services/cloudinaryService";
 
 // Helper to detect if running in an iOS In-App Browser (WhatsApp, Instagram, FB, Telegram, etc.)
 const isInAppBrowser = () => {
-  const ua = navigator.userAgent || navigator.vendor || window.opera;
+  const ua = navigator.userAgent || navigator.vendor || window.opera || "";
   const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
   const isWebview = isIOS && (
     ua.includes("FBAN") ||
@@ -29,16 +29,20 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSelfieCameraActive, setIsSelfieCameraActive] = useState(false);
   const [isQrScannerActive, setIsQrScannerActive] = useState(false);
+  const [qrFacingMode, setQrFacingMode] = useState("environment"); // "environment" | "user"
   const [showTroubleshoot, setShowTroubleshoot] = useState(false);
 
   // Refs for Selfie Capture
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const streamRef = useRef(null);
+  const selfieVideoRef = useRef(null);
+  const selfieCanvasRef = useRef(null);
+  const selfieStreamRef = useRef(null);
 
-  // Ref for Html5Qrcode Scanner instance & DOM Observer
-  const qrScannerRef = useRef(null);
-  const observerRef = useRef(null);
+  // Refs for Direct iOS-Native QR Scanner
+  const qrVideoRef = useRef(null);
+  const qrCanvasRef = useRef(null);
+  const qrStreamRef = useRef(null);
+  const scanAnimationRef = useRef(null);
+  const isScanningRef = useRef(false);
 
   const { isIOS, isWebview } = isInAppBrowser();
 
@@ -53,27 +57,24 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
       setSuccessMsg("");
       setIsProcessing(false);
       setShowTroubleshoot(false);
+      setQrFacingMode("environment");
       startSelfieCamera();
     } else {
-      cleanupAllCameras();
+      cleanupAll();
     }
 
     return () => {
-      cleanupAllCameras();
+      cleanupAll();
     };
   }, [isOpen]);
 
-  const cleanupAllCameras = () => {
+  const cleanupAll = () => {
     stopSelfieCamera();
-    stopQrScanner();
-    if (observerRef.current) {
-      observerRef.current.disconnect();
-      observerRef.current = null;
-    }
+    stopQrCamera();
   };
 
   // -------------------------------------------------------------
-  // STEP 1: SELFIE CAMERA LOGIC (iOS / Safari Compatible)
+  // STEP 1: SELFIE CAMERA LOGIC (Front Camera)
   // -------------------------------------------------------------
   const startSelfieCamera = async () => {
     stopSelfieCamera();
@@ -82,7 +83,6 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
 
     try {
       let stream = null;
-      // Try ideal front camera constraints
       try {
         stream = await navigator.mediaDevices.getUserMedia({
           video: {
@@ -93,21 +93,20 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
           audio: false
         });
       } catch (err) {
-        // Fallback for older iOS Safari without ideal constraints
         stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: "user" },
           audio: false
         });
       }
 
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.setAttribute("playsinline", "true");
-        videoRef.current.setAttribute("webkit-playsinline", "true");
-        videoRef.current.muted = true;
+      selfieStreamRef.current = stream;
+      if (selfieVideoRef.current) {
+        selfieVideoRef.current.srcObject = stream;
+        selfieVideoRef.current.setAttribute("playsinline", "true");
+        selfieVideoRef.current.setAttribute("webkit-playsinline", "true");
+        selfieVideoRef.current.muted = true;
         try {
-          await videoRef.current.play();
+          await selfieVideoRef.current.play();
         } catch (e) {
           console.warn("Selfie video play error:", e);
         }
@@ -126,26 +125,24 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
   };
 
   const stopSelfieCamera = () => {
-    if (streamRef.current) {
+    if (selfieStreamRef.current) {
       try {
-        streamRef.current.getTracks().forEach((track) => {
-          track.stop();
-        });
+        selfieStreamRef.current.getTracks().forEach((track) => track.stop());
       } catch (e) {}
-      streamRef.current = null;
+      selfieStreamRef.current = null;
     }
-    if (videoRef.current) {
+    if (selfieVideoRef.current) {
       try {
-        videoRef.current.srcObject = null;
+        selfieVideoRef.current.srcObject = null;
       } catch (e) {}
     }
     setIsSelfieCameraActive(false);
   };
 
   const captureSelfie = () => {
-    if (!videoRef.current || !canvasRef.current) return;
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
+    if (!selfieVideoRef.current || !selfieCanvasRef.current) return;
+    const video = selfieVideoRef.current;
+    const canvas = selfieCanvasRef.current;
 
     canvas.width = video.videoWidth || 640;
     canvas.height = video.videoHeight || 480;
@@ -168,176 +165,150 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
 
   const proceedToQRScan = () => {
     if (!selfieDataUrl) return;
-    // Teardown selfie stream first
     stopSelfieCamera();
-    // 500ms delay to allow iOS hardware camera hardware unlock before mounting back camera
+    // 350ms delay for iOS hardware camera unlock
     setTimeout(() => {
       setStep("qr");
-    }, 500);
+    }, 350);
   };
 
   // -------------------------------------------------------------
-  // STEP 2: QR CODE SCANNER LOGIC (iOS / Safari Compatible)
+  // STEP 2: DIRECT NATIVE QR SCANNER (100% iOS Safari Compatible)
   // -------------------------------------------------------------
   useEffect(() => {
-    let html5QrCode = null;
-    let isMounted = true;
-
     if (isOpen && step === "qr") {
-      const timer = setTimeout(async () => {
-        try {
-          const container = document.getElementById("qr-reader-target");
-          if (!container || !isMounted) return;
-
-          // Clean up prior scanner instance
-          if (qrScannerRef.current) {
-            try {
-              await qrScannerRef.current.stop();
-            } catch (e) {}
-            try {
-              qrScannerRef.current.clear();
-            } catch (e) {}
-            qrScannerRef.current = null;
-          }
-
-          // Setup MutationObserver on container to enforce playsinline immediately when <video> element is injected
-          if (observerRef.current) {
-            observerRef.current.disconnect();
-          }
-          observerRef.current = new MutationObserver((mutations) => {
-            mutations.forEach(() => {
-              const video = container.querySelector("video");
-              if (video) {
-                video.setAttribute("playsinline", "true");
-                video.setAttribute("webkit-playsinline", "true");
-                video.setAttribute("muted", "true");
-                video.muted = true;
-                video.setAttribute("autoplay", "true");
-              }
-            });
-          });
-          observerRef.current.observe(container, { childList: true, subtree: true });
-
-          // Initialize Html5Qrcode with stable JavaScript decoding engine (disabling buggy WebKit BarcodeDetector)
-          html5QrCode = new Html5Qrcode("qr-reader-target", {
-            verbose: false,
-            experimentalFeatures: {
-              useBarCodeDetectorIfSupported: false // IMPORTANT: false ensures 100% reliable jsQR/zxing on iOS 17/18
-            }
-          });
-          qrScannerRef.current = html5QrCode;
-
-          const config = {
-            fps: 15,
-            qrbox: (viewfinderWidth, viewfinderHeight) => {
-              const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-              const edgeSize = Math.max(180, Math.floor(minEdge * 0.75));
-              return { width: edgeSize, height: edgeSize };
-            },
-            aspectRatio: 1.0
-          };
-
-          const onScanSuccess = (decodedText) => {
-            if (navigator.vibrate) {
-              try {
-                navigator.vibrate(100);
-              } catch (e) {}
-            }
-            handleQRScanned(decodedText, html5QrCode);
-          };
-
-          const onScanFailure = () => {
-            // No-op for continuous scanning frames
-          };
-
-          // Resilient Multi-Tier Camera Start for iOS
-          let cameraStarted = false;
-
-          // Tier 1: Try environment / back camera with ideal constraint
-          try {
-            await html5QrCode.start({ facingMode: { ideal: "environment" } }, config, onScanSuccess, onScanFailure);
-            cameraStarted = true;
-          } catch (t1Err) {
-            console.warn("Tier 1 environment camera start failed, trying Tier 2:", t1Err);
-          }
-
-          // Tier 2: Try basic facingMode environment
-          if (!cameraStarted && isMounted) {
-            try {
-              await html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess, onScanFailure);
-              cameraStarted = true;
-            } catch (t2Err) {
-              console.warn("Tier 2 environment camera start failed, trying Tier 3:", t2Err);
-            }
-          }
-
-          // Tier 3: Fallback to user / front camera if back lens is blocked or unavailable
-          if (!cameraStarted && isMounted) {
-            try {
-              await html5QrCode.start({ facingMode: "user" }, config, onScanSuccess, onScanFailure);
-              cameraStarted = true;
-            } catch (t3Err) {
-              console.warn("Tier 3 user camera start failed:", t3Err);
-            }
-          }
-
-          if (cameraStarted && isMounted) {
-            setIsQrScannerActive(true);
-            // Apply inline video styling safeguard
-            const video = container.querySelector("video");
-            if (video) {
-              video.setAttribute("playsinline", "true");
-              video.setAttribute("webkit-playsinline", "true");
-              video.muted = true;
-            }
-          } else if (isMounted) {
-            setShowTroubleshoot(true);
-            setErrorMsg("Camera error on iPhone/iOS. Please ensure camera permissions are allowed in Safari settings, or ask your faculty for manual attendance.");
-          }
-        } catch (e) {
-          console.warn("Html5Qrcode init exception:", e);
-          if (isMounted) {
-            setShowTroubleshoot(true);
-            setErrorMsg("Camera access failed. Please reload or open in native Safari browser.");
-          }
-        }
-      }, 400);
-
-      return () => {
-        isMounted = false;
-        clearTimeout(timer);
-        stopQrScanner();
-      };
+      startQrCamera(qrFacingMode);
+    } else {
+      stopQrCamera();
     }
-  }, [isOpen, step]);
 
-  const stopQrScanner = () => {
-    if (observerRef.current) {
-      observerRef.current.disconnect();
-      observerRef.current = null;
-    }
-    if (qrScannerRef.current) {
+    return () => {
+      stopQrCamera();
+    };
+  }, [isOpen, step, qrFacingMode]);
+
+  const startQrCamera = async (facingModeToUse = "environment") => {
+    stopQrCamera();
+    setErrorMsg("");
+    setShowTroubleshoot(false);
+
+    try {
+      let stream = null;
+      // Try back camera with ideal constraint
       try {
-        qrScannerRef.current
-          .stop()
-          .then(() => {
-            try {
-              qrScannerRef.current?.clear();
-            } catch (e) {}
-            qrScannerRef.current = null;
-          })
-          .catch(() => {
-            try {
-              qrScannerRef.current?.clear();
-            } catch (e) {}
-            qrScannerRef.current = null;
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: facingModeToUse },
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          },
+          audio: false
+        });
+      } catch (err1) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: facingModeToUse },
+            audio: false
           });
+        } catch (err2) {
+          // Fallback to any available video stream
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false
+          });
+        }
+      }
+
+      qrStreamRef.current = stream;
+      if (qrVideoRef.current) {
+        qrVideoRef.current.srcObject = stream;
+        qrVideoRef.current.setAttribute("playsinline", "true");
+        qrVideoRef.current.setAttribute("webkit-playsinline", "true");
+        qrVideoRef.current.muted = true;
+        await qrVideoRef.current.play();
+
+        setIsQrScannerActive(true);
+        isScanningRef.current = true;
+        // Start continuous frame analysis with jsQR
+        requestAnimationFrame(scanQrFrame);
+      }
+    } catch (err) {
+      console.warn("QR Camera error on iOS:", err);
+      setShowTroubleshoot(true);
+      if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+        setErrorMsg("Camera permission is required. On iPhone: tap 'aA' in Safari address bar > Website Settings > Camera > Allow.");
+      } else {
+        setErrorMsg("Could not start back camera. Tap 'Switch Camera' or retry.");
+      }
+      setIsQrScannerActive(false);
+    }
+  };
+
+  const stopQrCamera = () => {
+    isScanningRef.current = false;
+    if (scanAnimationRef.current) {
+      cancelAnimationFrame(scanAnimationRef.current);
+      scanAnimationRef.current = null;
+    }
+    if (qrStreamRef.current) {
+      try {
+        qrStreamRef.current.getTracks().forEach((track) => track.stop());
+      } catch (e) {}
+      qrStreamRef.current = null;
+    }
+    if (qrVideoRef.current) {
+      try {
+        qrVideoRef.current.srcObject = null;
       } catch (e) {}
     }
     setIsQrScannerActive(false);
   };
 
-  const handleQRScanned = async (decodedText, qrInstance) => {
+  const toggleQrCamera = () => {
+    const nextMode = qrFacingMode === "environment" ? "user" : "environment";
+    setQrFacingMode(nextMode);
+  };
+
+  // Frame processing loop using jsQR on offscreen canvas
+  const scanQrFrame = () => {
+    if (!isScanningRef.current) return;
+
+    const video = qrVideoRef.current;
+    const canvas = qrCanvasRef.current;
+
+    if (video && video.readyState === video.HAVE_ENOUGH_DATA && canvas) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+      if (ctx && canvas.width > 0 && canvas.height > 0) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+        // Decode QR using jsQR
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: "dontInvert"
+        });
+
+        if (code && code.data && code.data.trim()) {
+          if (navigator.vibrate) {
+            try {
+              navigator.vibrate(100);
+            } catch (e) {}
+          }
+          isScanningRef.current = false;
+          handleQRScanned(code.data.trim());
+          return;
+        }
+      }
+    }
+
+    if (isScanningRef.current) {
+      scanAnimationRef.current = requestAnimationFrame(scanQrFrame);
+    }
+  };
+
+  const handleQRScanned = async (decodedText) => {
     try {
       let data = null;
       const cleanText = (decodedText || "").trim();
@@ -366,15 +337,17 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
         throw new Error("Incomplete QR Code data. Please scan the active projector screen.");
       }
 
-      if (qrInstance) {
-        try {
-          await qrInstance.stop();
-        } catch (e) {}
-      }
-
+      stopQrCamera();
       await processAttendanceData(data);
     } catch (e) {
       setErrorMsg(e.message || "Invalid QR Code scanned.");
+      // Resume scanning on error after 1.5s
+      setTimeout(() => {
+        if (isOpen && step === "qr") {
+          isScanningRef.current = true;
+          requestAnimationFrame(scanQrFrame);
+        }
+      }, 1500);
     }
   };
 
@@ -430,7 +403,7 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
       if (onSuccess) onSuccess(record);
 
       setTimeout(() => {
-        cleanupAllCameras();
+        cleanupAll();
         onClose();
       }, 2000);
     } catch (err) {
@@ -459,7 +432,7 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
           </div>
           <button
             onClick={() => {
-              cleanupAllCameras();
+              cleanupAll();
               onClose();
             }}
             className="w-8 h-8 rounded-full hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
@@ -559,7 +532,7 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
               ------------------------------------------------------------- */}
           {step === "selfie" && (
             <div className="space-y-4">
-              <canvas ref={canvasRef} className="hidden" />
+              <canvas ref={selfieCanvasRef} className="hidden" />
 
               <div className="relative rounded-2xl overflow-hidden bg-slate-950 aspect-[4/3] max-h-[280px] w-full flex flex-col items-center justify-center border border-slate-200 shadow-inner mx-auto">
                 {selfieDataUrl ? (
@@ -572,7 +545,7 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
                 ) : (
                   <div className="relative w-full h-full flex items-center justify-center">
                     <video
-                      ref={videoRef}
+                      ref={selfieVideoRef}
                       autoPlay
                       playsInline
                       webkit-playsinline="true"
@@ -606,7 +579,7 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
                   {!isSelfieCameraActive && (
                     <button
                       onClick={startSelfieCamera}
-                      className="w-full py-2 bg-slate-100 text-slate-700 font-semibold rounded-xl text-xs hover:bg-slate-200 transition-colors flex items-center justify-center gap-1.5"
+                      className="w-full py-2 bg-slate-100 text-slate-700 font-semibold rounded-xl text-xs hover:bg-slate-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <RefreshCw className="w-3.5 h-3.5" /> Retry Camera Permissions
                     </button>
@@ -635,15 +608,22 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
           )}
 
           {/* -------------------------------------------------------------
-              STEP 2 VIEW: SCAN CLASSROOM QR CODE (iOS WebKit Optimized)
+              STEP 2 VIEW: SCAN CLASSROOM QR CODE (Native Video + jsQR)
               ------------------------------------------------------------- */}
           {step === "qr" && (
             <div className="space-y-4">
+              {/* Offscreen canvas for jsQR analysis */}
+              <canvas ref={qrCanvasRef} className="hidden" />
+
               <div className="relative rounded-2xl overflow-hidden bg-slate-950 aspect-[4/3] max-h-[280px] w-full flex flex-col items-center justify-center border border-slate-200 shadow-inner mx-auto">
-                <div
-                  id="qr-reader-target"
-                  className="w-full h-full flex items-center justify-center [&_video]:w-full [&_video]:h-full [&_video]:object-cover [&_video]:rounded-xl [&_img]:hidden"
-                ></div>
+                <video
+                  ref={qrVideoRef}
+                  autoPlay
+                  playsInline
+                  webkit-playsinline="true"
+                  muted
+                  className={`w-full h-full object-cover rounded-2xl ${qrFacingMode === "user" ? "transform -scale-x-100" : ""}`}
+                />
 
                 {isQrScannerActive && !isProcessing && (
                   <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
@@ -667,7 +647,7 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
               <div className="flex justify-between items-center text-xs">
                 <button
                   onClick={() => {
-                    cleanupAllCameras();
+                    cleanupAll();
                     setStep("selfie");
                     startSelfieCamera();
                   }}
@@ -675,7 +655,15 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
                 >
                   ⬅️ Retake Live Selfie
                 </button>
-                <span className="text-slate-400 font-mono text-[10px] sm:text-[11px]">Facing: Classroom Projector</span>
+
+                <button
+                  onClick={toggleQrCamera}
+                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                  title="Switch between front and back camera"
+                >
+                  <SwitchCamera className="w-3.5 h-3.5 text-blue-600" />
+                  <span>{qrFacingMode === "environment" ? "Back Camera" : "Front Camera"}</span>
+                </button>
               </div>
             </div>
           )}
@@ -689,7 +677,7 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
           </span>
           <button
             onClick={() => {
-              cleanupAllCameras();
+              cleanupAll();
               onClose();
             }}
             className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold text-xs rounded-xl transition-colors cursor-pointer active:scale-98"
