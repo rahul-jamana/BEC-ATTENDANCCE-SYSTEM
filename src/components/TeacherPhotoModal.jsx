@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { X, Camera, RefreshCw, CheckCircle2, ShieldCheck, QrCode, CloudUpload } from "lucide-react";
+import { X, Camera, RefreshCw, CheckCircle2, ShieldCheck, QrCode } from "lucide-react";
 import { uploadPhotoToCloudinary } from "../services/cloudinaryService";
 
 export const TeacherPhotoModal = ({ isOpen, onClose, onConfirmPhoto, sessionDetails }) => {
@@ -30,26 +30,54 @@ export const TeacherPhotoModal = ({ isOpen, onClose, onConfirmPhoto, sessionDeta
     stopCamera();
     setCameraError("");
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" }
-      });
+      let stream = null;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
+          audio: false
+        });
+      } catch (e) {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user" },
+          audio: false
+        });
+      }
+
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        videoRef.current.setAttribute("playsinline", "true");
+        videoRef.current.setAttribute("webkit-playsinline", "true");
+        videoRef.current.muted = true;
+        try {
+          await videoRef.current.play();
+        } catch (playErr) {
+          console.warn("Faculty video play error:", playErr);
+        }
         setIsCameraActive(true);
       }
     } catch (err) {
       console.warn("Teacher camera access error:", err);
-      setCameraError("Camera access required for live photo verification. Please allow camera permissions in your browser.");
+      if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+        setCameraError("Camera permission denied. On iPhone, go to Settings > Safari > Camera and set to 'Allow'.");
+      } else {
+        setCameraError("Camera access required for live photo verification. Please allow camera permissions in your browser.");
+      }
       setIsCameraActive(false);
     }
   };
 
   const stopCamera = () => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      try {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+      } catch (e) {}
       streamRef.current = null;
+    }
+    if (videoRef.current) {
+      try {
+        videoRef.current.srcObject = null;
+      } catch (e) {}
     }
     setIsCameraActive(false);
   };
@@ -58,12 +86,16 @@ export const TeacherPhotoModal = ({ isOpen, onClose, onConfirmPhoto, sessionDeta
     if (!videoRef.current || !canvasRef.current) return;
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    
+
     canvas.width = video.videoWidth || 640;
     canvas.height = video.videoHeight || 480;
     const ctx = canvas.getContext("2d");
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     
+    // Draw mirrored selfie
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
     const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
     setPhotoDataUrl(dataUrl);
     stopCamera();
@@ -96,7 +128,6 @@ export const TeacherPhotoModal = ({ isOpen, onClose, onConfirmPhoto, sessionDeta
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 overflow-y-auto">
       <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-100 relative animate-in fade-in zoom-in duration-200">
-        
         {/* Header */}
         <div className="gradient-header text-white p-5 flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -109,7 +140,10 @@ export const TeacherPhotoModal = ({ isOpen, onClose, onConfirmPhoto, sessionDeta
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={() => {
+              stopCamera();
+              onClose();
+            }}
             className="p-2 rounded-xl hover:bg-white/20 text-white transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
@@ -118,7 +152,6 @@ export const TeacherPhotoModal = ({ isOpen, onClose, onConfirmPhoto, sessionDeta
 
         {/* Content Body */}
         <div className="p-6 space-y-5">
-          
           {/* Target Session Banner */}
           {sessionDetails && (
             <div className="bg-blue-50 border border-blue-200/70 rounded-2xl p-3.5 text-xs space-y-1">
@@ -136,16 +169,15 @@ export const TeacherPhotoModal = ({ isOpen, onClose, onConfirmPhoto, sessionDeta
 
           {/* Camera View / Photo Preview */}
           <div className="relative rounded-2xl overflow-hidden bg-slate-950 min-h-[300px] flex flex-col items-center justify-center border-2 border-slate-200 shadow-inner">
-            
             {/* Hidden Canvas for Snapshots */}
             <canvas ref={canvasRef} className="hidden" />
 
             {photoDataUrl ? (
               // Captured Photo Preview
               <div className="relative w-full h-full flex flex-col items-center justify-center p-2">
-                <img 
-                  src={photoDataUrl} 
-                  alt="Faculty Live Captured Photo" 
+                <img
+                  src={photoDataUrl}
+                  alt="Faculty Live Captured Photo"
                   className="max-h-[280px] w-auto rounded-xl object-contain shadow-md border-2 border-emerald-400"
                 />
                 <div className="absolute top-4 right-4 bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg flex items-center gap-1.5 animate-in fade-in">
@@ -159,8 +191,9 @@ export const TeacherPhotoModal = ({ isOpen, onClose, onConfirmPhoto, sessionDeta
                   ref={videoRef}
                   autoPlay
                   playsInline
+                  webkit-playsinline="true"
                   muted
-                  className="w-full h-[300px] object-cover"
+                  className="w-full h-[300px] object-cover transform -scale-x-100"
                 />
 
                 {/* Reticle Frame */}
@@ -182,7 +215,7 @@ export const TeacherPhotoModal = ({ isOpen, onClose, onConfirmPhoto, sessionDeta
                 <p>{cameraError}</p>
                 <button
                   onClick={startCamera}
-                  className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-bold"
+                  className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-bold cursor-pointer"
                 >
                   Retry Camera
                 </button>
@@ -231,7 +264,6 @@ export const TeacherPhotoModal = ({ isOpen, onClose, onConfirmPhoto, sessionDeta
               </div>
             )}
           </div>
-
         </div>
 
         {/* Footer Security Badge */}
