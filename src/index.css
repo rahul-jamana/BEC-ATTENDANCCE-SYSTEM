@@ -70,26 +70,6 @@
   animation: pulseGlow 2s infinite ease-in-out;
 }
 
-/* Google Pay / PhonePe Sweeping Laser Animation */
-@keyframes laserScan {
-  0% {
-    top: 5%;
-    opacity: 0.8;
-  }
-  50% {
-    top: 92%;
-    opacity: 1;
-  }
-  100% {
-    top: 5%;
-    opacity: 0.8;
-  }
-}
-
-.animate-laser-scan {
-  animation: laserScan 1.8s infinite ease-in-out;
-}
-
 /* Mobile Hardware & Camera Responsiveness Fixes */
 html, body {
   -webkit-tap-highlight-color: transparent;

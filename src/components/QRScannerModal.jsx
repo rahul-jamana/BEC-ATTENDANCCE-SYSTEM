@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import jsQR from "jsqr";
-import { X, Camera, AlertTriangle, CheckCircle2, ShieldCheck, QrCode, RefreshCw, ArrowRight, ExternalLink, SwitchCamera, Sparkles, Volume2 } from "lucide-react";
+import { X, Camera, AlertTriangle, CheckCircle2, ShieldCheck, QrCode, RefreshCw, ArrowRight, ExternalLink, SwitchCamera, ZoomIn, ZoomOut } from "lucide-react";
 import { DataService } from "../services/dataService";
 import { uploadPhotoToCloudinary } from "../services/cloudinaryService";
 
@@ -57,6 +57,8 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
   const [isSelfieCameraActive, setIsSelfieCameraActive] = useState(false);
   const [isQrScannerActive, setIsQrScannerActive] = useState(false);
   const [qrFacingMode, setQrFacingMode] = useState("environment"); // "environment" | "user"
+  const [zoomLevel, setZoomLevel] = useState(1); // 1 | 2 | 3
+  const [maxHardwareZoom, setMaxHardwareZoom] = useState(1);
   const [showTroubleshoot, setShowTroubleshoot] = useState(false);
   const [scannedEffectActive, setScannedEffectActive] = useState(false);
 
@@ -65,13 +67,14 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
   const selfieCanvasRef = useRef(null);
   const selfieStreamRef = useRef(null);
 
-  // Refs for Direct iOS-Native Fast QR Scanner
+  // Refs for Direct Fast QR Scanner
   const qrVideoRef = useRef(null);
   const qrCanvasRef = useRef(null);
   const qrStreamRef = useRef(null);
   const scanAnimationRef = useRef(null);
   const isScanningRef = useRef(false);
   const frameCountRef = useRef(0);
+  const zoomLevelRef = useRef(1);
 
   const { isIOS, isWebview } = isInAppBrowser();
 
@@ -88,6 +91,8 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
       setShowTroubleshoot(false);
       setScannedEffectActive(false);
       setQrFacingMode("environment");
+      setZoomLevel(1);
+      zoomLevelRef.current = 1;
       startSelfieCamera();
     } else {
       cleanupAll();
@@ -196,14 +201,14 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
   const proceedToQRScan = () => {
     if (!selfieDataUrl) return;
     stopSelfieCamera();
-    // 300ms delay for iOS hardware camera unlock
+    // 300ms delay for hardware camera unlock
     setTimeout(() => {
       setStep("qr");
     }, 300);
   };
 
   // -------------------------------------------------------------
-  // STEP 2: HIGH-SPEED GOOGLE PAY STYLE SCANNER (Ultra-Fast 60fps)
+  // STEP 2: HIGH-SPEED INSTANT SCANNER + ZOOM ENGINE
   // -------------------------------------------------------------
   useEffect(() => {
     if (isOpen && step === "qr") {
@@ -250,17 +255,22 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
         }
       }
 
-      // Apply continuous auto-focus if supported by camera hardware
+      // Check hardware zoom and continuous auto-focus capabilities
       try {
         const videoTrack = stream.getVideoTracks()[0];
         const capabilities = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
+        
+        if (capabilities.zoom) {
+          setMaxHardwareZoom(capabilities.zoom.max || 1);
+        }
+
         if (capabilities.focusMode && capabilities.focusMode.includes("continuous")) {
           await videoTrack.applyConstraints({
             advanced: [{ focusMode: "continuous" }]
           });
         }
       } catch (e) {
-        // Focus constraints unsupported on some iOS devices
+        // Capabilities not fully supported on some webviews
       }
 
       qrStreamRef.current = stream;
@@ -274,11 +284,11 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
         setIsQrScannerActive(true);
         isScanningRef.current = true;
         frameCountRef.current = 0;
-        // Start lightning-fast frame scanning loop
+        // Start instant frame scanning loop
         requestAnimationFrame(scanQrFrame);
       }
     } catch (err) {
-      console.warn("QR Camera error on iOS:", err);
+      console.warn("QR Camera error:", err);
       setShowTroubleshoot(true);
       if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
         setErrorMsg("Camera permission is required. On iPhone: tap 'aA' in Safari address bar > Website Settings > Camera > Allow.");
@@ -314,9 +324,30 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
     setQrFacingMode(nextMode);
   };
 
+  // Zoom Handler (Applies Hardware Zoom where available + Universal Digital Magnification)
+  const handleZoomChange = async (newZoom) => {
+    setZoomLevel(newZoom);
+    zoomLevelRef.current = newZoom;
+
+    // Apply hardware camera zoom if supported
+    if (qrStreamRef.current) {
+      try {
+        const track = qrStreamRef.current.getVideoTracks()[0];
+        const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+        if (capabilities.zoom) {
+          const targetZoom = Math.min(newZoom, capabilities.zoom.max || newZoom);
+          await track.applyConstraints({
+            advanced: [{ zoom: targetZoom }]
+          });
+        }
+      } catch (e) {
+        // Hardware zoom fallback will use CSS & canvas crop magnification
+      }
+    }
+  };
+
   // -------------------------------------------------------------
-  // ULTRA-FAST GOOGLE-PAY OPTIMIZED SCANNING LOOP
-  // Downscales and crops to 400x400 center region for 2ms instant decode!
+  // ULTRA-FAST 2ms INSTANT SCANNING LOOP (Google Pay / PhonePe Speed)
   // -------------------------------------------------------------
   const scanQrFrame = () => {
     if (!isScanningRef.current) return;
@@ -331,14 +362,16 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
       if (vWidth > 0 && vHeight > 0) {
         frameCountRef.current += 1;
         const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        const currentZoom = zoomLevelRef.current || 1;
 
-        // Pass 1 (Every Frame): Crop specifically to the center 70% viewfinder box
-        // Target 400x400 ROI = 160,000 pixels (~2ms CPU cycle!)
+        // Pass 1 (Every Frame): Crop specifically to the center viewfinder box with zoom factor
         const TARGET_BOX_SIZE = 400;
         canvas.width = TARGET_BOX_SIZE;
         canvas.height = TARGET_BOX_SIZE;
 
-        const cropDim = Math.min(vWidth, vHeight) * 0.75;
+        // Calculate zoom crop window
+        const baseCropDim = Math.min(vWidth, vHeight) * 0.75;
+        const cropDim = baseCropDim / currentZoom;
         const cropX = (vWidth - cropDim) / 2;
         const cropY = (vHeight - cropDim) / 2;
 
@@ -349,7 +382,7 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
           inversionAttempts: "dontInvert"
         });
 
-        // Pass 2 (Every 3rd Frame Fallback): If not found in center crop, check full frame downscaled to 480x360
+        // Pass 2 (Every 3rd Frame Fallback): Full frame downscaled to 480x360 for wide/off-center scans
         if (!code && frameCountRef.current % 3 === 0) {
           const FULL_W = 480;
           const FULL_H = Math.round((vHeight / vWidth) * FULL_W) || 360;
@@ -362,7 +395,7 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
           });
         }
 
-        // Instant Success Trigger (Google Pay / PhonePe style)
+        // Instant Success Trigger
         if (code && code.data && code.data.trim()) {
           isScanningRef.current = false;
           setScannedEffectActive(true);
@@ -477,7 +510,7 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
         livePhoto: finalPhotoUrl
       });
 
-      setSuccessMsg(`🎉 Verified & Marked Attendance for ${targetSession.subjectName || "Class"}!`);
+      setSuccessMsg(`🎉 Attendance Marked for ${targetSession.subjectName || "Class"}!`);
       if (onSuccess) onSuccess(record);
 
       setTimeout(() => {
@@ -690,7 +723,7 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
           )}
 
           {/* -------------------------------------------------------------
-              STEP 2 VIEW: GOOGLE PAY / PHONEPE STYLE FAST QR SCANNER
+              STEP 2 VIEW: CLEAN QUICK-SCAN VIEW WITH AUTO-ZOOM
               ------------------------------------------------------------- */}
           {step === "qr" && (
             <div className="space-y-4">
@@ -704,10 +737,14 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
                   playsInline
                   webkit-playsinline="true"
                   muted
-                  className={`w-full h-full object-cover rounded-2xl ${qrFacingMode === "user" ? "transform -scale-x-100" : ""}`}
+                  style={{
+                    transform: `${qrFacingMode === "user" ? "scaleX(-1) " : ""}scale(${zoomLevel})`,
+                    transition: "transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)"
+                  }}
+                  className="w-full h-full object-cover rounded-2xl origin-center"
                 />
 
-                {/* Google Pay Style Reticle & Glowing Laser Scan Line */}
+                {/* Minimal Clean Reticle (No Blue Line) */}
                 {isQrScannerActive && !isProcessing && (
                   <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                     <div className={`w-48 h-48 sm:w-56 sm:h-56 rounded-3xl relative transition-all duration-300 ${
@@ -716,16 +753,11 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
                         : "border-2 border-sky-400/70 shadow-[0_0_0_9999px_rgba(15,23,42,0.6)]"
                     }`}>
                       
-                      {/* 4 Glowing Corner Brackets */}
+                      {/* Clean 4 Corner Brackets */}
                       <div className={`absolute -top-1.5 -left-1.5 w-6 h-6 border-t-4 border-l-4 rounded-tl-xl transition-colors ${scannedEffectActive ? "border-emerald-400" : "border-cyan-400"}`}></div>
                       <div className={`absolute -top-1.5 -right-1.5 w-6 h-6 border-t-4 border-r-4 rounded-tr-xl transition-colors ${scannedEffectActive ? "border-emerald-400" : "border-cyan-400"}`}></div>
                       <div className={`absolute -bottom-1.5 -left-1.5 w-6 h-6 border-b-4 border-l-4 rounded-bl-xl transition-colors ${scannedEffectActive ? "border-emerald-400" : "border-cyan-400"}`}></div>
                       <div className={`absolute -bottom-1.5 -right-1.5 w-6 h-6 border-b-4 border-r-4 rounded-br-xl transition-colors ${scannedEffectActive ? "border-emerald-400" : "border-cyan-400"}`}></div>
-
-                      {/* Sweeping Laser Beam (Google Pay / PhonePe Effect) */}
-                      {!scannedEffectActive && (
-                        <div className="absolute inset-x-2 h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_15px_#22d3ee] rounded-full animate-laser-scan"></div>
-                      )}
 
                       {/* Snap Verified Badge */}
                       {scannedEffectActive && (
@@ -735,6 +767,30 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
                           </div>
                         </div>
                       )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Floating Quick Zoom Buttons (1x | 2x | 3x) for Backbenchers */}
+                {isQrScannerActive && !isProcessing && (
+                  <div className="absolute bottom-3 inset-x-0 flex items-center justify-center gap-2 z-10">
+                    <div className="bg-slate-900/80 backdrop-blur-md px-2 py-1 rounded-full border border-white/20 flex items-center gap-1 shadow-lg">
+                      <span className="text-[10px] text-slate-300 font-bold px-1 flex items-center gap-0.5">
+                        <ZoomIn className="w-3 h-3" /> Zoom:
+                      </span>
+                      {[1, 2, 3].map((z) => (
+                        <button
+                          key={z}
+                          onClick={() => handleZoomChange(z)}
+                          className={`w-7 h-7 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                            zoomLevel === z
+                              ? "bg-blue-600 text-white shadow-md scale-110"
+                              : "bg-white/15 text-slate-200 hover:bg-white/30"
+                          }`}
+                        >
+                          {z}x
+                        </button>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -778,7 +834,7 @@ export const QRScannerModal = ({ isOpen, onClose, studentProfile, onSuccess }) =
         {/* Modal Footer */}
         <div className="bg-slate-50 px-4 sm:px-5 py-3 border-t border-slate-200 flex justify-between items-center text-xs shrink-0">
           <span className="flex items-center gap-1 text-slate-500 text-[11px]">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> Google Pay Style Fast-Snap Engine
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> QuickSnap Instant Engine Active
           </span>
           <button
             onClick={() => {
