@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { DataService } from "../services/dataService";
 import { QRScannerModal } from "../components/QRScannerModal";
@@ -7,10 +8,11 @@ import {
   Camera, QrCode, AlertTriangle, CheckCircle2, BookOpen, GraduationCap, 
   BarChart3, RefreshCw, Sparkles, Award, Clock, FileText, HeartPulse, 
   User, Calendar, ShieldCheck, ChevronRight, Layers, TrendingUp, Download, X,
-  Edit3, Save, UserCog
+  Edit3, Save, UserCog, Library, Building2
 } from "lucide-react";
 
 export const StudentDashboard = () => {
+  const navigate = useNavigate();
   const { userProfile, refreshProfile, updateProfile } = useAuth();
   const [stats, setStats] = useState([]);
   const [attendanceLogs, setAttendanceLogs] = useState([]);
@@ -120,7 +122,7 @@ export const StudentDashboard = () => {
   const medicalExemptionsCount = attendanceLogs.filter(l => l.medicalExemption || l.markedByAdmin).length;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-sky-50 to-blue-100 pb-28 sm:pb-16">
+    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-sky-50 to-blue-100 pb-12 sm:pb-16">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-5 sm:space-y-6">
         
         {/* ========================================================
@@ -171,38 +173,41 @@ export const StudentDashboard = () => {
               )}
             </div>
 
-            {/* SUPER PROMINENT SCAN QR CODE & EXCEL DOWNLOAD BUTTONS */}
-            <div className="w-full lg:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            {/* SUPER PROMINENT SCAN QR CODE & CLEAN SECONDARY ACTION BUTTONS */}
+            <div className="w-full lg:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
               <button
                 onClick={() => setIsScannerOpen(true)}
-                className="px-8 py-5 bg-white hover:bg-blue-50 text-blue-900 font-black text-base sm:text-lg rounded-2xl shadow-2xl shadow-blue-950/40 transition-all hover:scale-105 hover:shadow-cyan-400/30 flex items-center justify-center space-x-3 cursor-pointer group ring-4 ring-white/30"
+                className="w-full sm:w-auto px-6 sm:px-8 py-4 bg-white hover:bg-blue-50 text-blue-900 font-black text-sm sm:text-base rounded-2xl shadow-xl transition-all hover:scale-102 flex items-center justify-center space-x-3 cursor-pointer group ring-4 ring-white/30"
               >
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-blue-600 to-sky-500 text-white flex items-center justify-center shadow-md group-hover:rotate-6 transition-transform">
-                  <Camera className="w-7 h-7" />
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-sky-500 text-white flex items-center justify-center shadow-md group-hover:rotate-6 transition-transform shrink-0">
+                  <Camera className="w-5 h-5" />
                 </div>
                 <div className="text-left">
-                  <div className="text-[11px] font-bold text-blue-600 uppercase tracking-widest leading-none">Instant Attendance</div>
-                  <div className="text-base sm:text-xl font-extrabold tracking-wide">SCAN QR CODE</div>
+                  <div className="text-[10px] font-bold text-blue-600 uppercase tracking-widest leading-none">Instant Attendance</div>
+                  <div className="text-sm sm:text-lg font-extrabold tracking-wide">SCAN QR CODE</div>
                 </div>
-                <div className="w-3 h-3 rounded-full bg-emerald-500 animate-ping ml-2"></div>
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping ml-1 shrink-0"></div>
               </button>
 
-              <button
-                onClick={handleExportMyExcel}
-                className="px-5 py-4 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black rounded-2xl border border-emerald-400 flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer"
-                title="Download My Personal Attendance Excel Sheet"
-              >
-                <Download className="w-4 h-4" />
-                <span className="hidden sm:inline">My Excel</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleExportMyExcel}
+                  className="flex-1 sm:flex-none px-4 py-3.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-2xl border border-emerald-400 flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer"
+                  title="Download My Personal Attendance Excel Sheet"
+                >
+                  <Download className="w-4 h-4 shrink-0" />
+                  <span>Excel Sheet</span>
+                </button>
 
-              <button
-                onClick={fetchStudentStats}
-                className="px-3.5 py-4 bg-white/15 hover:bg-white/25 text-white text-xs font-bold rounded-2xl border border-white/20 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                title="Refresh Statistics"
-              >
-                <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-              </button>
+                <button
+                  onClick={fetchStudentStats}
+                  className="px-3.5 py-3.5 bg-white/15 hover:bg-white/25 text-white text-xs font-bold rounded-2xl border border-white/20 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  title="Refresh Statistics"
+                >
+                  <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+                  <span className="sm:hidden text-xs">Refresh</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -281,7 +286,27 @@ export const StudentDashboard = () => {
                 </span>
               </button>
 
-              {/* Tab 3: Active Activity Logs */}
+              {/* Tab 3: Hostel & Campus Services */}
+              <button
+                onClick={() => setActiveTab("hostel")}
+                className={`w-full px-4 py-3 rounded-2xl font-bold text-xs flex items-center justify-between transition-all cursor-pointer ${
+                  activeTab === "hostel"
+                    ? "bg-gradient-to-r from-blue-600 to-sky-600 text-white shadow-md shadow-blue-500/25"
+                    : "text-slate-700 hover:bg-blue-50 hover:text-blue-700"
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <Building2 className="w-4 h-4" />
+                  <span>Hostel &amp; Campus</span>
+                </div>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  activeTab === "hostel" ? "bg-white/20 text-white" : "bg-blue-100 text-blue-800"
+                }`}>
+                  Block A
+                </span>
+              </button>
+
+              {/* Tab 4: Active Activity Logs */}
               <button
                 onClick={() => setActiveTab("logs")}
                 className={`w-full px-4 py-3 rounded-2xl font-bold text-xs flex items-center justify-between transition-all cursor-pointer ${
@@ -322,6 +347,29 @@ export const StudentDashboard = () => {
               >
                 <Camera className="w-4 h-4 text-blue-700" />
                 <span>Open Scanner</span>
+              </button>
+            </div>
+
+            {/* Sidebar Central Library CTA Card */}
+            <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-blue-950 text-white rounded-3xl p-5 shadow-lg border border-indigo-500/30 space-y-3">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 rounded-xl bg-indigo-500/30 border border-indigo-400/40 flex items-center justify-center font-bold">
+                  <Library className="w-4 h-4 text-indigo-300" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-sm">Central Library</h4>
+                  <p className="text-[11px] text-indigo-200">Catalog, Notes &amp; Loans</p>
+                </div>
+              </div>
+              <p className="text-xs text-indigo-100/90 leading-relaxed">
+                Browse engineering books, check return due dates, and download solved question papers.
+              </p>
+              <button
+                onClick={() => navigate("/library")}
+                className="w-full py-3 bg-indigo-500 hover:bg-indigo-600 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <BookOpen className="w-4 h-4" />
+                <span>Open Library Portal</span>
               </button>
             </div>
 
@@ -728,6 +776,75 @@ export const StudentDashboard = () => {
               </div>
             )}
 
+            {/* ========================================================
+                TAB: HOSTEL & CAMPUS FACILITIES
+                ======================================================== */}
+            {activeTab === "hostel" && (
+              <div className="space-y-6">
+                {/* Hostel Allocation Status Card */}
+                <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 shadow-sm border border-blue-100 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold">
+                        <Building2 className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-bold text-slate-900">Hostel &amp; Residential Life</h2>
+                        <p className="text-xs text-slate-500">Bhubaneswar Engineering College Campus Accommodation</p>
+                      </div>
+                    </div>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Room Allocated
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Hostel Block</span>
+                      <span className="text-base font-extrabold text-slate-900 mt-1 block">Block-A (Boys Hostel)</span>
+                      <span className="text-xs text-slate-500">2nd Floor, Wing B</span>
+                    </div>
+
+                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Assigned Room</span>
+                      <span className="text-base font-extrabold text-blue-700 mt-1 block">Room No. 204</span>
+                      <span className="text-xs text-slate-500">Triple Occupancy</span>
+                    </div>
+
+                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Hostel Warden</span>
+                      <span className="text-base font-extrabold text-slate-900 mt-1 block">Prof. B. K. Jena</span>
+                      <span className="text-xs text-slate-500">📞 +91 94370 12345</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mess Menu & Schedule */}
+                <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 shadow-sm border border-blue-100 space-y-4">
+                  <h3 className="text-base font-bold text-slate-900">Campus Mess Schedule &amp; Timings</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                    <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200">
+                      <span className="font-bold text-amber-900 block">☕ Morning Breakfast</span>
+                      <span className="text-slate-600 font-medium mt-1 block">07:30 AM – 09:00 AM</span>
+                      <span className="text-[11px] text-amber-700 block mt-0.5">Idli / Puri / Upma + Tea / Coffee</span>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200">
+                      <span className="font-bold text-emerald-900 block">🍲 Afternoon Lunch</span>
+                      <span className="text-slate-600 font-medium mt-1 block">12:30 PM – 02:00 PM</span>
+                      <span className="text-[11px] text-emerald-700 block mt-0.5">Rice, Dal, Veg Curry, Paneer / Egg, Salad</span>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-200">
+                      <span className="font-bold text-indigo-900 block">🍛 Night Dinner</span>
+                      <span className="text-slate-600 font-medium mt-1 block">08:00 PM – 09:30 PM</span>
+                      <span className="text-[11px] text-indigo-700 block mt-0.5">Roti, Rice, Dal Fry, Special Sabzi, Kheer</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
           </div>
 
         </div>
@@ -899,20 +1016,6 @@ export const StudentDashboard = () => {
           </div>
         </div>
       )}
-
-      {/* Floating Mobile Bottom Scan Bar for 1-thumb scanning on phones */}
-      <div className="fixed bottom-3 left-3 right-3 z-40 sm:hidden">
-        <button
-          onClick={() => setIsScannerOpen(true)}
-          className="w-full py-3.5 px-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 active:from-blue-700 active:to-sky-700 text-white font-extrabold text-sm rounded-2xl shadow-2xl shadow-blue-950/60 border border-white/20 flex items-center justify-center space-x-2.5 active:scale-98 transition-transform cursor-pointer"
-        >
-          <div className="p-1.5 bg-white/20 rounded-xl">
-            <Camera className="w-5 h-5 text-white" />
-          </div>
-          <span className="tracking-wide">📸 SCAN CLASSROOM QR CODE</span>
-          <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping ml-1"></div>
-        </button>
-      </div>
 
     </div>
   );

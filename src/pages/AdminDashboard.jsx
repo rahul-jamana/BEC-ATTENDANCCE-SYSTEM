@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { DataService } from "../services/dataService";
 import { parseStudentExcel } from "../utils/excelParser";
@@ -13,10 +14,11 @@ import {
   Trash2, Plus, RefreshCw, CheckCircle, AlertCircle, Layers, ClipboardCheck,
   HeartPulse, Sparkles, AlertTriangle, Camera, Image as ImageIcon,
   Search, Filter, GraduationCap, Percent, CheckCircle2, Calendar, Clock, School,
-  BarChart3, Edit3, Save
+  BarChart3, Edit3, Save, Library
 } from "lucide-react";
 
 export const AdminDashboard = () => {
+  const navigate = useNavigate();
   const { userProfile } = useAuth();
   const [users, setUsers] = useState([]);
   const [subjects, setSubjects] = useState([]);
@@ -845,6 +847,15 @@ export const AdminDashboard = () => {
           >
             <Camera className="w-4 h-4" />
             <span>Photo Access</span>
+          </button>
+
+          <button
+            onClick={() => navigate("/library")}
+            className="px-4 py-2.5 rounded-xl font-bold text-xs flex items-center space-x-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 hover:text-indigo-900 border border-indigo-200 transition-all cursor-pointer shadow-2xs"
+            title="Open Central Library & Circulation Console"
+          >
+            <Library className="w-4 h-4 text-indigo-600" />
+            <span>📚 Library Console</span>
           </button>
         </div>
 

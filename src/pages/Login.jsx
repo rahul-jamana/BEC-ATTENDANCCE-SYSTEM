@@ -1,18 +1,24 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
-import { QrCode, Lock, Mail, ArrowRight, UserCheck, Shield, School, GraduationCap, Eye, EyeOff } from "lucide-react";
+import {
+  GraduationCap, School, Shield, ArrowRight,
+  Lock, User, Eye, EyeOff, AlertCircle
+} from "lucide-react";
 
 export const Login = () => {
-  const [email, setEmail] = useState("");
+  // Selected portal: "student" | "teacher" | "admin"
+  const [selectedRole, setSelectedRole] = useState("student");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { login, demoLogin, userProfile, role, status } = useAuth();
+
+  const { login, userProfile, role, status } = useAuth();
   const navigate = useNavigate();
 
-  // If already logged in, redirect to dashboard
+  // If already logged in, redirect to appropriate role dashboard
   useEffect(() => {
     if (userProfile && role) {
       redirectUserRole(role, status);
@@ -23,35 +29,23 @@ export const Login = () => {
     e.preventDefault();
     setError("");
     setLoading(true);
+
     try {
-      const user = await login(email, password);
+      const user = await login(identifier.trim(), password.trim());
       redirectUserRole(user.role, user.status);
     } catch (err) {
-      setError(err.message || "Failed to log in.");
+      setError(err.message || "Invalid credentials. Please verify your details.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleQuickDemo = async (demoEmail) => {
-    setError("");
-    setLoading(true);
-    try {
-      const user = await demoLogin(demoEmail);
-      redirectUserRole(user.role, user.status);
-    } catch (err) {
-      setError(err.message || "Demo login failed.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const redirectUserRole = (role, status) => {
-    if (status === "pending") {
+  const redirectUserRole = (userRole, userStatus) => {
+    if (userStatus === "pending") {
       navigate("/pending");
       return;
     }
-    switch (role) {
+    switch (userRole) {
       case "admin":
         navigate("/admin");
         break;
@@ -67,129 +61,257 @@ export const Login = () => {
   };
 
   return (
-    <div className="min-h-screen lg:h-screen bg-gradient-to-br from-blue-200 via-sky-100 to-blue-100 flex items-center justify-center p-3 sm:p-4 overflow-y-auto lg:overflow-hidden">
-      <div className="max-w-4xl w-full grid grid-cols-1 md:grid-cols-2 rounded-3xl overflow-hidden shadow-2xl border border-blue-200/80 bg-white max-h-[92vh]">
-        
-        {/* Left Side: Brand & Hero Banner with Campus Background */}
-        <div 
-          className="text-white p-6 sm:p-8 flex flex-col justify-end relative overflow-hidden bg-cover bg-center shadow-inner min-h-[260px] md:min-h-full"
-          style={{ 
-            backgroundImage: `linear-gradient(180deg, rgba(15, 23, 42, 0.15) 0%, rgba(15, 23, 42, 0.75) 100%), url('/bec-campus.jpg')` 
-          }}
-        >
-          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-blue-400/20 blur-3xl pointer-events-none"></div>
-          
-          <div className="relative z-10 flex items-center space-x-3 bg-slate-900/40 backdrop-blur-sm p-3.5 rounded-2xl border border-white/20 shadow-xl">
-            <div className="w-12 h-12 rounded-xl bg-white p-1 shadow-xl flex items-center justify-center ring-2 ring-white/50 shrink-0">
-              <img src="/bec-logo.png" alt="Bhubaneswar Engineering College Logo" className="w-full h-full object-contain" />
+    <div 
+      className="min-h-screen relative flex flex-col justify-between bg-cover bg-center bg-no-repeat bg-fixed"
+      style={{
+        backgroundImage: `linear-gradient(135deg, rgba(15, 23, 42, 0.55) 0%, rgba(30, 58, 138, 0.45) 50%, rgba(15, 23, 42, 0.65) 100%), url('/bec-campus.jpg')`
+      }}
+    >
+      {/* Top Banner / Navbar */}
+      <header className="w-full bg-white/95 backdrop-blur-md border-b border-white/20 py-3 px-4 sm:px-8 shadow-md">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-xl bg-white p-0.5 border border-slate-200 shadow-xs flex items-center justify-center">
+              <img src="/bec-logo.png" alt="BEC Logo" className="w-full h-full object-contain" />
             </div>
             <div>
-              <h1 className="text-lg sm:text-xl font-extrabold text-white leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-                Bhubaneswar Engineering College
+              <h1 className="text-sm sm:text-base font-extrabold text-blue-950 tracking-tight leading-tight">
+                BHUBANESWAR ENGINEERING COLLEGE
               </h1>
-              <span className="text-[11px] font-semibold text-blue-200 uppercase tracking-widest block mt-0.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                BEC Portal
-              </span>
+              <p className="text-[10px] font-bold text-blue-600 tracking-wider uppercase">
+                Autonomous Institution • BPUT Affiliated
+              </p>
             </div>
           </div>
+
+          <Link
+            to="/signup"
+            className="hidden sm:inline-flex items-center px-4 py-1.5 rounded-full text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-all shadow-xs"
+          >
+            New Student? Register
+          </Link>
         </div>
+      </header>
 
-        {/* Right Side: Login Form & Quick Demo Buttons */}
-        <div className="p-6 sm:p-8 flex flex-col justify-between overflow-y-auto">
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-900">Sign In to BEC Portal</h2>
-            <p className="text-slate-500 text-xs mt-0.5">Enter your institutional credentials below</p>
+      {/* Main Login Card Container */}
+      <main className="flex-1 flex items-center justify-center p-4 sm:p-6 md:p-8 relative">
+        <div className="max-w-2xl w-full bg-white/98 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/40 overflow-hidden relative z-10">
+          
+          {/* 3 Top Role Selector Tabs */}
+          <div className="p-4 sm:p-6 pb-2 border-b border-slate-100">
+            <div className="grid grid-cols-3 gap-2 sm:gap-3 bg-slate-50 p-1.5 rounded-2xl border border-slate-200">
+              
+              {/* Student Tab */}
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedRole("student");
+                  setError("");
+                }}
+                className={`flex items-center justify-center sm:justify-start gap-2.5 p-3 rounded-xl transition-all cursor-pointer text-left ${
+                  selectedRole === "student"
+                    ? "bg-white text-blue-900 shadow-md ring-2 ring-blue-500 border border-blue-100"
+                    : "text-slate-600 hover:text-blue-800 hover:bg-white/60"
+                }`}
+              >
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                  selectedRole === "student" ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-600"
+                }`}>
+                  <GraduationCap className="w-5 h-5" />
+                </div>
+                <div className="hidden sm:block">
+                  <div className="text-xs font-extrabold leading-tight">Student</div>
+                  <div className="text-[10px] text-slate-500 font-medium">Roll No &amp; DOB</div>
+                </div>
+              </button>
 
+              {/* Teacher Tab */}
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedRole("teacher");
+                  setError("");
+                }}
+                className={`flex items-center justify-center sm:justify-start gap-2.5 p-3 rounded-xl transition-all cursor-pointer text-left ${
+                  selectedRole === "teacher"
+                    ? "bg-white text-blue-900 shadow-md ring-2 ring-blue-500 border border-blue-100"
+                    : "text-slate-600 hover:text-blue-800 hover:bg-white/60"
+                }`}
+              >
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                  selectedRole === "teacher" ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-600"
+                }`}>
+                  <School className="w-5 h-5" />
+                </div>
+                <div className="hidden sm:block">
+                  <div className="text-xs font-extrabold leading-tight">Teacher</div>
+                  <div className="text-[10px] text-slate-500 font-medium">Faculty Email</div>
+                </div>
+              </button>
+
+              {/* Admin Tab */}
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedRole("admin");
+                  setError("");
+                }}
+                className={`flex items-center justify-center sm:justify-start gap-2.5 p-3 rounded-xl transition-all cursor-pointer text-left ${
+                  selectedRole === "admin"
+                    ? "bg-white text-blue-900 shadow-md ring-2 ring-blue-500 border border-blue-100"
+                    : "text-slate-600 hover:text-blue-800 hover:bg-white/60"
+                }`}
+              >
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                  selectedRole === "admin" ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-600"
+                }`}>
+                  <Shield className="w-5 h-5" />
+                </div>
+                <div className="hidden sm:block">
+                  <div className="text-xs font-extrabold leading-tight">Admin</div>
+                  <div className="text-[10px] text-slate-500 font-medium">Master Console</div>
+                </div>
+              </button>
+
+            </div>
+          </div>
+
+          {/* Form Content */}
+          <div className="p-6 sm:p-8 sm:pt-6">
+            
+            {/* Header / Title */}
+            <div className="text-center space-y-2 mb-6">
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-blue-700 bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
+                {selectedRole === "student" && "🎓 STUDENT PORTAL LOGIN"}
+                {selectedRole === "teacher" && "👨‍🏫 FACULTY PORTAL LOGIN"}
+                {selectedRole === "admin" && "👑 ADMIN CONSOLE LOGIN"}
+              </span>
+
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                Sign in to {selectedRole === "student" ? "Student Portal" : selectedRole === "teacher" ? "Faculty Portal" : "Admin Portal"}
+              </h2>
+
+              <p className="text-xs sm:text-sm text-slate-500 font-medium">
+                Access Attendance, Central Library, Notes, and ID Pass.
+              </p>
+            </div>
+
+            {/* Error Banner */}
             {error && (
-              <div className="mt-3 p-2.5 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl font-medium">
-                {error}
+              <div className="mb-4 p-3.5 bg-red-50 border border-red-200 rounded-2xl text-xs font-semibold text-red-700 flex items-center gap-2.5">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                <span>{error}</span>
               </div>
             )}
 
-            <form onSubmit={handleLogin} className="mt-4 space-y-3">
+            {/* Login Form */}
+            <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className="block text-[11px] font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                  Email, Student ID / Roll No, or Reg No
+                <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                  {selectedRole === "student" ? "Roll Number / Registration No / Email *" : "Email Address *"}
                 </label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                  <User className="w-4 h-4 text-blue-500 absolute left-4 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
                     required
-                    placeholder="name@bec.ac.in or BEC26002"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-none transition-all font-medium"
+                    autoFocus
+                    placeholder={
+                      selectedRole === "student"
+                        ? "e.g. 2401211001 or student@bec.ac.in"
+                        : "e.g. teacher@bec.ac.in"
+                    }
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3 text-xs sm:text-sm bg-slate-50/70 rounded-2xl border border-slate-200 font-medium text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all"
                   />
                 </div>
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-[11px] font-semibold text-slate-700 uppercase tracking-wider">
-                    Password
-                  </label>
-                  <span className="text-[10px] text-blue-600 font-semibold">
-                    DOB (YYYY-MM-DD) for students
-                  </span>
-                </div>
+                <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                  {selectedRole === "student" ? "Password (or Date of Birth YYYY-MM-DD) *" : "Password *"}
+                </label>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                  <Lock className="w-4 h-4 text-blue-500 absolute left-4 top-1/2 -translate-y-1/2" />
                   <input
                     type={showPassword ? "text" : "password"}
                     required
-                    placeholder="e.g. 2004-06-18 or account password"
+                    placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-9 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-none transition-all"
+                    className="w-full pl-11 pr-11 py-3 text-xs sm:text-sm bg-slate-50/70 rounded-2xl border border-slate-200 font-medium text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((prev) => !prev)}
-                    className="absolute right-3 top-2.5 text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
-                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
 
+              {/* Royal Blue Action Button */}
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition-all shadow-md shadow-blue-500/20 flex items-center justify-center space-x-2"
+                className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-extrabold rounded-2xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2"
               >
-                <span>{loading ? "Authenticating..." : "Sign In"}</span>
-                <ArrowRight className="w-4 h-4" />
+                {loading ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <>
+                    <span>Enter {selectedRole === "student" ? "Student Hub" : selectedRole === "teacher" ? "Faculty Hub" : "Admin Hub"}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
               </button>
             </form>
 
-            <div className="mt-4 text-center">
-              <span className="text-xs font-bold text-blue-700 tracking-wide uppercase bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
-                ✨ Welcome to BEC
-              </span>
+            {/* Quick Demo Login Credentials */}
+            <div className="mt-6 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-center gap-2.5 text-xs text-slate-500 font-medium">
+              <span>Quick Login:</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedRole("student");
+                  setIdentifier("2401211001");
+                  setPassword("2006-05-12");
+                }}
+                className="px-3 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg font-bold border border-blue-200/80 transition-colors cursor-pointer"
+              >
+                Sample Student
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedRole("admin");
+                  setIdentifier("admin@bec.ac.in");
+                  setPassword("admin123");
+                }}
+                className="px-3 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg font-bold border border-blue-200/80 transition-colors cursor-pointer"
+              >
+                Admin
+              </button>
             </div>
-          </div>
 
-          {/* Clean Institutional Security & Support Footer */}
-          <div className="mt-5 pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-500 gap-2">
-            <div className="flex items-center space-x-1.5">
-              <Shield className="w-3.5 h-3.5 text-blue-600" />
-              <span className="font-semibold text-slate-600">BEC Secure Attendance</span>
+            {/* Mobile Register Link */}
+            <div className="sm:hidden text-center mt-4">
+              <Link to="/signup" className="text-xs font-bold text-blue-600 hover:underline">
+                New Student? Register Here
+              </Link>
             </div>
-            <a
-              href="https://www.ayushtechnologies.in/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
-            >
-              <span>Design &amp; Developed by Ayush Technologies</span>
-            </a>
+
           </div>
 
         </div>
+      </main>
 
-      </div>
+      {/* Footer */}
+      <footer className="w-full bg-white/90 backdrop-blur-md border-t border-white/20 py-3 px-4 text-center text-xs text-slate-700 font-semibold shadow-inner">
+        Bhubaneswar Engineering College • Unified Campus Portal • Attendance • Central Library • Hostel &amp; Mess
+      </footer>
     </div>
   );
 };

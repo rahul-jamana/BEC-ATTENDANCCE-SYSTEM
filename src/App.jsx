@@ -10,6 +10,7 @@ import { TeacherDashboard } from "./pages/TeacherDashboard";
 import { AdminDashboard } from "./pages/AdminDashboard";
 import { PendingNotice } from "./pages/PendingNotice";
 import { AyushMasterPortal } from "./pages/AyushMasterPortal";
+import { LibraryPage } from "./pages/LibraryPage";
 
 // Role & Status Protected Route Wrappers
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -97,6 +98,14 @@ export default function App() {
                 element={
                   <ProtectedRoute allowedRoles={["admin"]}>
                     <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/library"
+                element={
+                  <ProtectedRoute allowedRoles={["student", "admin", "teacher"]}>
+                    <LibraryPage />
                   </ProtectedRoute>
                 }
               />
