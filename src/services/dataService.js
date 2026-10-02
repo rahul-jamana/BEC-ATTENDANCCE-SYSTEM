@@ -1334,5 +1334,113 @@ export const DataService = {
   },
   getSemesters() {
     return DEFAULT_SEMESTERS;
+  },
+
+  // --- LIVE GEOFENCED BROADCAST ATTENDANCE SESSIONS ---
+  async startLiveGeofencedSession(sessionData) {
+    const session = {
+      id: `geo_sess_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(), // Active for 15 mins
+      status: "active",
+      radiusMeters: 80,
+      ...sessionData
+    };
+
+    let sessions = [];
+    try {
+      sessions = JSON.parse(localStorage.getItem("bec_live_geo_sessions") || "[]");
+    } catch (e) {
+      sessions = [];
+    }
+
+    // Inactivate any old session for same branch/year/section
+    sessions = sessions.map(s => {
+      if (s.branch === session.branch && s.year === session.year && s.section === session.section) {
+        return { ...s, status: "closed" };
+      }
+      return s;
+    });
+
+    sessions.push(session);
+    localStorage.setItem("bec_live_geo_sessions", JSON.stringify(sessions));
+
+    // Also sync to Firestore if live Firebase is active
+    if (isLiveFirebaseConfigured && db) {
+      try {
+        await setDoc(doc(db, "live_geo_sessions", session.id), session);
+      } catch (e) {
+        console.warn("Firestore live session sync warning:", e);
+      }
+    }
+
+    return session;
+  },
+
+  async getActiveGeofencedSession(branch, year, section) {
+    let sessions = [];
+    try {
+      sessions = JSON.parse(localStorage.getItem("bec_live_geo_sessions") || "[]");
+    } catch (e) {
+      sessions = [];
+    }
+
+    const now = new Date().toISOString();
+    const active = sessions.find(s => 
+      s.status === "active" &&
+      s.expiresAt > now &&
+      (!branch || s.branch.toUpperCase() === branch.toUpperCase()) &&
+      (!year || s.year === year) &&
+      (!section || s.section.toUpperCase() === section.toUpperCase())
+    );
+
+    return active || null;
+  },
+
+  async closeLiveGeofencedSession(sessionId) {
+    let sessions = [];
+    try {
+      sessions = JSON.parse(localStorage.getItem("bec_live_geo_sessions") || "[]");
+    } catch (e) {
+      sessions = [];
+    }
+
+    sessions = sessions.map(s => s.id === sessionId ? { ...s, status: "closed" } : s);
+    localStorage.setItem("bec_live_geo_sessions", JSON.stringify(sessions));
+    return true;
+  },
+
+  async submitGeofencedAttendance(recordData) {
+    const attendanceRecord = {
+      id: `geo_att_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      timestamp: new Date().toISOString(),
+      date: new Date().toISOString().split("T")[0],
+      status: "present",
+      method: "80m_geofenced_selfie",
+      ...recordData
+    };
+
+    // Store in local attendance store
+    let records = [];
+    try {
+      records = JSON.parse(localStorage.getItem("bec_attendance_records") || "[]");
+    } catch (e) {
+      records = [];
+    }
+
+    // Check for duplicate attendance for same session + student
+    const exists = records.some(r => r.sessionId === recordData.sessionId && r.studentId === recordData.studentId);
+    if (exists) {
+      throw new Error("You have already marked attendance for this live class session.");
+    }
+
+    records.push(attendanceRecord);
+    localStorage.setItem("bec_attendance_records", JSON.stringify(records));
+
+    // Also sync to DataService attendance logs
+    await this.addAttendanceRecord(attendanceRecord);
+
+    return attendanceRecord;
   }
 };
+

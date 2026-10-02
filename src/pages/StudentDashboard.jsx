@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { DataService } from "../services/dataService";
 import { QRScannerModal } from "../components/QRScannerModal";
+import { StudentAttendancePopUpModal } from "../components/StudentAttendancePopUpModal";
 import { exportStudentCompleteExcel, exportClassTotalExcel } from "../utils/pdfExporter";
 import { 
   Camera, QrCode, AlertTriangle, CheckCircle2, BookOpen, GraduationCap, 
@@ -914,6 +915,8 @@ export const StudentDashboard = () => {
         </button>
       </div>
 
+      {/* Live Geofenced 80m Pop-Up Modal */}
+      <StudentAttendancePopUpModal />
     </div>
   );
 };

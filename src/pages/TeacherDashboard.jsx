@@ -5,6 +5,7 @@ import { ProjectorQRModal } from "../components/ProjectorQRModal";
 import { TeacherPhotoModal } from "../components/TeacherPhotoModal";
 import { TeacherManualAttendanceModal } from "../components/TeacherManualAttendanceModal";
 import { exportAttendancePDF, exportAttendanceExcel, exportTeacherSessionExcel } from "../utils/pdfExporter";
+import { getDeviceLocation } from "../utils/geoUtils";
 import { 
   QrCode, School, Play, StopCircle, FileText, Download, Users, 
   Sparkles, CheckCircle2, Clock, Filter, BookOpen, Layers, Camera,
@@ -129,13 +130,28 @@ export const TeacherDashboard = () => {
     setIsPhotoModalOpen(true);
   };
 
-  // Step 2: Faculty confirms live photo -> create session & launch projector
+  // Step 2: Faculty confirms live photo -> capture GPS, create session & start live 80m broadcast
   const handleTeacherPhotoConfirmed = async (teacherPhotoUrl) => {
     if (!pendingSessionData) return;
 
+    // Get Teacher GPS location for 80m classroom radius
+    const teacherLoc = await getDeviceLocation();
+
     const newSess = await DataService.createSession({
       ...pendingSessionData,
-      teacherPhoto: teacherPhotoUrl
+      teacherPhoto: teacherPhotoUrl,
+      location: teacherLoc
+    });
+
+    // Start 80m Live Geofenced Broadcast for student pop-up notifications
+    await DataService.startLiveGeofencedSession({
+      subject: pendingSessionData.subjectName,
+      branch: pendingSessionData.branch,
+      year: pendingSessionData.year,
+      section: pendingSessionData.section,
+      teacherName: pendingSessionData.teacherName,
+      teacherPhoto: teacherPhotoUrl,
+      location: teacherLoc
     });
 
     setIsPhotoModalOpen(false);
