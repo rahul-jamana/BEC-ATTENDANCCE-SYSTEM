@@ -1386,13 +1386,28 @@ export const DataService = {
     }
 
     const now = new Date().toISOString();
-    const active = sessions.find(s => 
-      s.status === "active" &&
-      s.expiresAt > now &&
-      (!branch || s.branch.toUpperCase() === branch.toUpperCase()) &&
-      (!year || s.year === year) &&
-      (!section || s.section.toUpperCase() === section.toUpperCase())
-    );
+    const active = sessions.find(s => {
+      if (s.status !== "active" || s.expiresAt <= now) return false;
+
+      const studentSec = (section || "").toUpperCase().trim();
+      const sessSec = (s.section || "").toUpperCase().trim();
+      const isSecMatch =
+        !section ||
+        sessSec === studentSec ||
+        sessSec.includes(studentSec) ||
+        sessSec.includes("ALL") ||
+        (studentSec && sessSec.includes(studentSec.replace("SEC", "").trim()));
+
+      const studentBranch = (branch || "").toUpperCase().trim();
+      const sessBranch = (s.branch || "").toUpperCase().trim();
+      const isBranchMatch =
+        !branch ||
+        sessBranch === studentBranch ||
+        sessBranch.includes(studentBranch) ||
+        studentBranch.includes(sessBranch);
+
+      return isSecMatch && isBranchMatch && (!year || s.year === year);
+    });
 
     return active || null;
   },

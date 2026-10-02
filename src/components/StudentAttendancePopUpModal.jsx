@@ -30,7 +30,7 @@ export const StudentAttendancePopUpModal = () => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
 
-  // Poll for active broadcasts for student's branch, year, section
+  // Listen for instant live broadcast events & poll for active sessions
   useEffect(() => {
     if (!userProfile || userProfile.role !== "student") return;
 
@@ -47,7 +47,7 @@ export const StudentAttendancePopUpModal = () => {
           setIsOpen(true);
           playAttendanceAlertChime(); // Play alert sound chime!
           verifyLocation(session);
-        } else if (!session) {
+        } else if (!session && activeSession) {
           setActiveSession(null);
           setIsOpen(false);
         }
@@ -57,8 +57,17 @@ export const StudentAttendancePopUpModal = () => {
     };
 
     checkLiveSession();
-    const interval = setInterval(checkLiveSession, 4000); // Check every 4s
-    return () => clearInterval(interval);
+    const interval = setInterval(checkLiveSession, 1500); // Check every 1.5s
+
+    // Instant event triggers
+    window.addEventListener("bec_live_session_started", checkLiveSession);
+    window.addEventListener("storage", checkLiveSession);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("bec_live_session_started", checkLiveSession);
+      window.removeEventListener("storage", checkLiveSession);
+    };
   }, [userProfile, activeSession, hasDismissed]);
 
   const verifyLocation = async (sessionToVerify = activeSession) => {

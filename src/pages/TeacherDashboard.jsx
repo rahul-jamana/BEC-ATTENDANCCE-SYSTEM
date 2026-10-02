@@ -131,7 +131,7 @@ export const TeacherDashboard = () => {
   };
 
   // Step 2: Faculty confirms live photo -> capture GPS, create session & start live 80m broadcast
-  const handleTeacherPhotoConfirmed = async (teacherPhotoUrl) => {
+  const handleTeacherPhotoConfirmed = async (teacherPhotoUrl, mode = "popup") => {
     if (!pendingSessionData) return;
 
     // Get Teacher GPS location for 80m classroom radius
@@ -154,10 +154,25 @@ export const TeacherDashboard = () => {
       location: teacherLoc
     });
 
+    // Dispatch global custom event for instant student pop-up trigger
+    window.dispatchEvent(new CustomEvent("bec_live_session_started", {
+      detail: {
+        branch: pendingSessionData.branch,
+        year: pendingSessionData.year,
+        section: pendingSessionData.section
+      }
+    }));
+
     setIsPhotoModalOpen(false);
     setPendingSessionData(null);
     setActiveSession(newSess);
-    setIsProjectorOpen(true);
+
+    if (mode === "qr") {
+      setIsProjectorOpen(true);
+    } else {
+      setIsProjectorOpen(false);
+    }
+
     loadTeacherData();
   };
 

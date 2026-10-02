@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { X, Camera, RefreshCw, CheckCircle2, ShieldCheck, QrCode } from "lucide-react";
+import { X, Camera, RefreshCw, CheckCircle2, ShieldCheck, QrCode, BellRing } from "lucide-react";
 import { uploadPhotoToCloudinary } from "../services/cloudinaryService";
 
 export const TeacherPhotoModal = ({ isOpen, onClose, onConfirmPhoto, sessionDetails }) => {
@@ -106,17 +106,17 @@ export const TeacherPhotoModal = ({ isOpen, onClose, onConfirmPhoto, sessionDeta
     startCamera();
   };
 
-  const handleConfirm = async () => {
+  const handleConfirm = async (mode = "popup") => {
     if (!photoDataUrl) return;
 
     setIsUploading(true);
     try {
       const cdnResult = await uploadPhotoToCloudinary(photoDataUrl, "faculty_live_photos", ["faculty", "temp_30days"]);
-      onConfirmPhoto(cdnResult.url);
+      onConfirmPhoto(cdnResult.url, mode);
     } catch (err) {
       console.warn("Cloudinary upload skipped, using live faculty photo data:", err.message);
       if (onConfirmPhoto) {
-        onConfirmPhoto(photoDataUrl);
+        onConfirmPhoto(photoDataUrl, mode);
       }
     } finally {
       setIsUploading(false);
@@ -235,32 +235,45 @@ export const TeacherPhotoModal = ({ isOpen, onClose, onConfirmPhoto, sessionDeta
                 <span>SNAP TEACHER LIVE PHOTO</span>
               </button>
             ) : (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2.5">
+                {/* Option A: Broadcast Live 80m Pop-up */}
                 <button
-                  onClick={handleRetake}
-                  className="py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-2xl transition-colors flex items-center justify-center space-x-2 cursor-pointer"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  <span>Retake Photo</span>
-                </button>
-
-                <button
-                  onClick={handleConfirm}
+                  onClick={() => handleConfirm("popup")}
                   disabled={isUploading}
-                  className="py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 text-white font-extrabold text-xs sm:text-sm rounded-2xl shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center space-x-2 cursor-pointer"
+                  className="w-full py-3.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 hover:from-blue-700 hover:to-sky-700 disabled:opacity-50 text-white font-extrabold text-sm rounded-2xl shadow-lg shadow-blue-500/25 transition-all flex items-center justify-center space-x-2 cursor-pointer"
                 >
                   {isUploading ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <span>Uploading Photo...</span>
+                      <span>Launching Live Broadcast...</span>
                     </>
                   ) : (
                     <>
-                      <QrCode className="w-4 h-4" />
-                      <span>GENERATE QR CODE</span>
+                      <BellRing className="w-5 h-5 text-amber-300 animate-bounce" />
+                      <span>BROADCAST LIVE 80M POP-UP</span>
                     </>
                   )}
                 </button>
+
+                {/* Option B: Retake & Generate QR Code */}
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    onClick={handleRetake}
+                    className="py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    <span>Retake Photo</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleConfirm("qr")}
+                    disabled={isUploading}
+                    className="py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
+                  >
+                    <QrCode className="w-4 h-4" />
+                    <span>Generate QR Code</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>
