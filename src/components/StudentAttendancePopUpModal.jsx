@@ -3,6 +3,8 @@ import { useAuth } from "../context/AuthContext";
 import { DataService } from "../services/dataService";
 import { getDeviceLocation, calculateDistanceMeters } from "../utils/geoUtils";
 import { playAttendanceAlertChime } from "../utils/soundUtils";
+import { db, isLiveFirebaseConfigured } from "../firebase/config";
+import { collection, onSnapshot } from "firebase/firestore";
 import { 
   BellRing, MapPin, Camera, CheckCircle2, AlertTriangle, 
   X, RefreshCw, ShieldCheck, UserCheck, Sparkles 
@@ -30,9 +32,27 @@ export const StudentAttendancePopUpModal = () => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
 
-  // Listen for instant live broadcast events & poll for active sessions
+  // Listen for instant live broadcast events via Cloud Firestore onSnapshot & local polling
   useEffect(() => {
     if (!userProfile || userProfile.role !== "student") return;
+
+    const processSession = (session) => {
+      if (session) {
+        if (session.id !== activeSession?.id || !isOpen) {
+          setActiveSession(session);
+          setIsOpen(true);
+          try {
+            playAttendanceAlertChime();
+          } catch (soundErr) {
+            console.warn("Audio autoplay suppressed by browser:", soundErr);
+          }
+          verifyLocation(session);
+        }
+      } else if (!session && activeSession) {
+        setActiveSession(null);
+        setIsOpen(false);
+      }
+    };
 
     const checkLiveSession = async () => {
       try {
@@ -41,35 +61,47 @@ export const StudentAttendancePopUpModal = () => {
           userProfile.year,
           userProfile.section
         );
-
-        if (session) {
-          if (session.id !== activeSession?.id || !isOpen) {
-            setActiveSession(session);
-            setIsOpen(true);
-            try {
-              playAttendanceAlertChime();
-            } catch (soundErr) {
-              console.warn("Audio autoplay suppressed by browser:", soundErr);
-            }
-            verifyLocation(session);
-          }
-        } else if (!session && activeSession) {
-          setActiveSession(null);
-          setIsOpen(false);
-        }
+        processSession(session);
       } catch (err) {
         console.error("Error checking live geofenced session:", err);
       }
     };
 
     checkLiveSession();
-    const interval = setInterval(checkLiveSession, 1000); // Fast 1s polling
+    const interval = setInterval(checkLiveSession, 1000); // 1s polling
 
     window.addEventListener("bec_live_session_started", checkLiveSession);
     window.addEventListener("storage", checkLiveSession);
 
+    // Real-Time Cloud Firestore WebSocket Listener for Multi-Device Push (Laptop -> Phone)
+    let unsubscribe = null;
+    if (isLiveFirebaseConfigured && db) {
+      try {
+        unsubscribe = onSnapshot(collection(db, "live_geo_sessions"), (snapshot) => {
+          const now = new Date().toISOString();
+          const activeDocs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+          const activeSess = activeDocs.find(s => {
+            if (s.status !== "active" || s.expiresAt <= now) return false;
+            const sYear = s.year || "1st";
+            const studYear = userProfile?.year || "1st";
+            if (sYear === "1st" && studYear === "1st") return true;
+            const sessSec = (s.section || "").toUpperCase();
+            const studSec = (userProfile?.section || "").toUpperCase();
+            if (sessSec.includes("COMBINE") || sessSec.includes("ALL") || (studSec && sessSec.includes(studSec))) return true;
+            return (!userProfile?.year || s.year === userProfile.year);
+          });
+          if (activeSess) {
+            processSession(activeSess);
+          }
+        });
+      } catch (e) {
+        console.warn("Firestore real-time subscription error:", e);
+      }
+    }
+
     return () => {
       clearInterval(interval);
+      if (unsubscribe) unsubscribe();
       window.removeEventListener("bec_live_session_started", checkLiveSession);
       window.removeEventListener("storage", checkLiveSession);
     };

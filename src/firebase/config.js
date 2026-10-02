@@ -10,12 +10,12 @@ const getClientApiKey = () => {
   );
 };
 
-// Live Firebase Project configuration for bec-at-system
+// Live Firebase Project configuration for becbbsr-90a44
 const firebaseConfig = {
   apiKey: getClientApiKey(),
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "bec-at-system.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "bec-at-system",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "bec-at-system.firebasestorage.app",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "becbbsr-90a44.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "becbbsr-90a44",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "becbbsr-90a44.firebasestorage.app",
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "5275309105",
   appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:5275309105:web:051261270458c3695bb110"
 };
