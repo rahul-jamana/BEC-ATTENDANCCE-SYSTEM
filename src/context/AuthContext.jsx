@@ -113,8 +113,16 @@ export const AuthProvider = ({ children }) => {
       const uTemp = (u.tempId || "").toLowerCase().replace(/[\s-_]/g, "");
       const uReg = (u.regNo || "").toLowerCase().replace(/[\s-_]/g, "");
       const uUid = (u.uid || "").toLowerCase().trim();
+
+      // Derived institutional email from student's name (e.g. "Sagar Hira" -> "sagarhira@bec.ac.in")
+      const nameAlpha = (u.name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const instEmail = nameAlpha ? `${nameAlpha}@bec.ac.in` : "";
+
+      const inputEmailPrefix = trimmedId.includes("@") ? trimmedId.split("@")[0].replace(/[^a-z0-9]/g, "") : cleanInput;
+
       return (
         uEmail === trimmedId ||
+        (instEmail && (trimmedId === instEmail || (trimmedId.endsWith("@bec.ac.in") && inputEmailPrefix === nameAlpha))) ||
         uRoll === cleanInput ||
         uTemp === cleanInput ||
         uUid === trimmedId ||
