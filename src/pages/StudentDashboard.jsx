@@ -19,6 +19,7 @@ export const StudentDashboard = () => {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("overview"); // "overview" | "subjects" | "logs"
   const [previewPhoto, setPreviewPhoto] = useState(null);
+  const [activeLiveSession, setActiveLiveSession] = useState(null);
 
   // Edit Profile Modal State
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
@@ -44,6 +45,13 @@ export const StudentDashboard = () => {
         .filter(a => a.studentId === userProfile.uid || a.rollNo === userProfile.rollNo || (a.tempId && a.tempId === userProfile.tempId))
         .sort((a, b) => new Date(b.markedAt) - new Date(a.markedAt));
       setAttendanceLogs(studentLogs);
+
+      const liveSess = await DataService.getActiveGeofencedSession(
+        userProfile.branch,
+        userProfile.year,
+        userProfile.section
+      );
+      setActiveLiveSession(liveSess);
     } catch (e) {
       console.error("Failed to load subject statistics:", e);
     } finally {
@@ -53,6 +61,17 @@ export const StudentDashboard = () => {
 
   useEffect(() => {
     fetchStudentStats();
+    const interval = setInterval(async () => {
+      if (userProfile) {
+        const liveSess = await DataService.getActiveGeofencedSession(
+          userProfile.branch,
+          userProfile.year,
+          userProfile.section
+        );
+        setActiveLiveSession(liveSess);
+      }
+    }, 1500);
+    return () => clearInterval(interval);
   }, [userProfile]);
 
   const handleOpenEditProfile = () => {
@@ -123,6 +142,36 @@ export const StudentDashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-100 via-sky-50 to-blue-100 pb-28 sm:pb-16">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-5 sm:space-y-6">
+
+        {/* Active Live Class Broadcast Alert Banner */}
+        {activeLiveSession && (
+          <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 text-white rounded-3xl p-5 shadow-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-2 border-white/40 animate-pulse">
+            <div className="flex items-center space-x-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0 ring-2 ring-white/30">
+                <Sparkles className="w-6 h-6 text-amber-300 animate-spin" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest bg-amber-400 text-amber-950 px-2.5 py-0.5 rounded-full shadow-sm">
+                  🔴 Live Attendance Broadcast Active
+                </span>
+                <h3 className="text-base sm:text-lg font-extrabold leading-tight mt-1">
+                  {activeLiveSession.subject || "Ongoing Lecture"} — Sec {activeLiveSession.section}
+                </h3>
+                <p className="text-xs text-blue-100 mt-0.5 font-medium">
+                  Faculty: <strong>{activeLiveSession.teacherName || "Teacher"}</strong> • Max 80m Radius
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent("bec_live_session_started"))}
+              className="w-full sm:w-auto px-6 py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 active:scale-98 text-white font-extrabold text-xs sm:text-sm rounded-2xl shadow-xl transition-all flex items-center justify-center space-x-2 cursor-pointer border border-white/30"
+            >
+              <UserCheck className="w-4 h-4 text-white" />
+              <span>OPEN POP-UP &amp; MARK PRESENT</span>
+            </button>
+          </div>
+        )}
         
         {/* ========================================================
             HERO GREETING BANNER & INSTANT SCAN QR PROMINENT ACTION

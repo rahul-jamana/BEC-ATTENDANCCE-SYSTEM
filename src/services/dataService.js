@@ -1386,42 +1386,26 @@ export const DataService = {
     }
 
     const now = new Date().toISOString();
+    // Return active non-expired session
     const active = sessions.find(s => {
       if (s.status !== "active" || s.expiresAt <= now) return false;
 
-      const studentSec = (section || "").toUpperCase().trim();
-      const sessSec = (s.section || "").toUpperCase().trim();
+      // 1st Year or Combined Section broadcasts match all 1st-year students
+      const sYear = s.year || "1st";
+      const studYear = year || "1st";
 
-      // Flexible section matching (handles Sec B, Section B, Sec A+B+C+D Combine, All Sections)
-      const isSecMatch =
-        !section ||
-        sessSec === studentSec ||
-        sessSec.includes("ALL") ||
-        sessSec.includes("COMBINE") ||
-        (studentSec && sessSec.includes(studentSec.replace("SECTION", "").replace("SEC", "").trim())) ||
-        (studentSec && studentSec.includes(sessSec.replace("SECTION", "").replace("SEC", "").trim()));
+      if (sYear === "1st" && studYear === "1st") {
+        return true;
+      }
 
-      const studentBranch = (branch || "").toUpperCase().trim();
-      const sessBranch = (s.branch || "").toUpperCase().trim();
+      const sessSec = (s.section || "").toUpperCase();
+      const studSec = (section || "").toUpperCase();
 
-      // 1st Year & Combined Section Broadcaster:
-      // 1st year BPUT subjects (Math-1, Physics, Chemistry) are common across all engineering branches.
-      const isCombinedOrCommon =
-        (s.year === "1st" && (!year || year === "1st")) ||
-        sessSec.includes("COMBINE") ||
-        sessSec.includes("ALL") ||
-        (sessBranch.includes("CSE") && studentBranch.includes("DATA"));
+      if (sessSec.includes("COMBINE") || sessSec.includes("ALL") || (studSec && sessSec.includes(studSec))) {
+        return true;
+      }
 
-      const isBranchMatch =
-        !branch ||
-        isCombinedOrCommon ||
-        sessBranch === studentBranch ||
-        sessBranch.includes(studentBranch) ||
-        studentBranch.includes(sessBranch);
-
-      const isYearMatch = !year || s.year === year || (s.year === "1st" && year === "1st");
-
-      return isSecMatch && isBranchMatch && isYearMatch;
+      return (!year || s.year === year);
     });
 
     return active || null;

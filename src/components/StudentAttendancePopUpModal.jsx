@@ -42,11 +42,17 @@ export const StudentAttendancePopUpModal = () => {
           userProfile.section
         );
 
-        if (session && session.id !== activeSession?.id && !hasDismissed) {
-          setActiveSession(session);
-          setIsOpen(true);
-          playAttendanceAlertChime(); // Play alert sound chime!
-          verifyLocation(session);
+        if (session) {
+          if (session.id !== activeSession?.id || !isOpen) {
+            setActiveSession(session);
+            setIsOpen(true);
+            try {
+              playAttendanceAlertChime();
+            } catch (soundErr) {
+              console.warn("Audio autoplay suppressed by browser:", soundErr);
+            }
+            verifyLocation(session);
+          }
         } else if (!session && activeSession) {
           setActiveSession(null);
           setIsOpen(false);
@@ -57,9 +63,8 @@ export const StudentAttendancePopUpModal = () => {
     };
 
     checkLiveSession();
-    const interval = setInterval(checkLiveSession, 1500); // Check every 1.5s
+    const interval = setInterval(checkLiveSession, 1000); // Fast 1s polling
 
-    // Instant event triggers
     window.addEventListener("bec_live_session_started", checkLiveSession);
     window.addEventListener("storage", checkLiveSession);
 
@@ -68,7 +73,7 @@ export const StudentAttendancePopUpModal = () => {
       window.removeEventListener("bec_live_session_started", checkLiveSession);
       window.removeEventListener("storage", checkLiveSession);
     };
-  }, [userProfile, activeSession, hasDismissed]);
+  }, [userProfile, activeSession, isOpen]);
 
   const verifyLocation = async (sessionToVerify = activeSession) => {
     if (!sessionToVerify) return;
