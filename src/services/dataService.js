@@ -1391,22 +1391,37 @@ export const DataService = {
 
       const studentSec = (section || "").toUpperCase().trim();
       const sessSec = (s.section || "").toUpperCase().trim();
+
+      // Flexible section matching (handles Sec B, Section B, Sec A+B+C+D Combine, All Sections)
       const isSecMatch =
         !section ||
         sessSec === studentSec ||
-        sessSec.includes(studentSec) ||
         sessSec.includes("ALL") ||
-        (studentSec && sessSec.includes(studentSec.replace("SEC", "").trim()));
+        sessSec.includes("COMBINE") ||
+        (studentSec && sessSec.includes(studentSec.replace("SECTION", "").replace("SEC", "").trim())) ||
+        (studentSec && studentSec.includes(sessSec.replace("SECTION", "").replace("SEC", "").trim()));
 
       const studentBranch = (branch || "").toUpperCase().trim();
       const sessBranch = (s.branch || "").toUpperCase().trim();
+
+      // 1st Year & Combined Section Broadcaster:
+      // 1st year BPUT subjects (Math-1, Physics, Chemistry) are common across all engineering branches.
+      const isCombinedOrCommon =
+        (s.year === "1st" && (!year || year === "1st")) ||
+        sessSec.includes("COMBINE") ||
+        sessSec.includes("ALL") ||
+        (sessBranch.includes("CSE") && studentBranch.includes("DATA"));
+
       const isBranchMatch =
         !branch ||
+        isCombinedOrCommon ||
         sessBranch === studentBranch ||
         sessBranch.includes(studentBranch) ||
         studentBranch.includes(sessBranch);
 
-      return isSecMatch && isBranchMatch && (!year || s.year === year);
+      const isYearMatch = !year || s.year === year || (s.year === "1st" && year === "1st");
+
+      return isSecMatch && isBranchMatch && isYearMatch;
     });
 
     return active || null;

@@ -110,16 +110,19 @@ export const TeacherPhotoModal = ({ isOpen, onClose, onConfirmPhoto, sessionDeta
     if (!photoDataUrl) return;
 
     setIsUploading(true);
+    let finalPhoto = photoDataUrl;
     try {
       const cdnResult = await uploadPhotoToCloudinary(photoDataUrl, "faculty_live_photos", ["faculty", "temp_30days"]);
-      onConfirmPhoto(cdnResult.url, mode);
-    } catch (err) {
-      console.warn("Cloudinary upload skipped, using live faculty photo data:", err.message);
-      if (onConfirmPhoto) {
-        onConfirmPhoto(photoDataUrl, mode);
+      if (cdnResult && cdnResult.url) {
+        finalPhoto = cdnResult.url;
       }
+    } catch (err) {
+      console.warn("Using instant faculty live photo fallback:", err.message);
     } finally {
       setIsUploading(false);
+      if (onConfirmPhoto) {
+        onConfirmPhoto(finalPhoto, mode);
+      }
     }
   };
 
