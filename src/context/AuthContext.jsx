@@ -131,17 +131,46 @@ export const AuthProvider = ({ children }) => {
     const userPass = (userFromDb.password || "").trim();
     const userDob = (userFromDb.dob || "").trim();
 
-    const normalizeDateDigits = (d) => String(d || "").replace(/[^0-9]/g, "");
+    const getDobVariations = (d) => {
+      if (!d) return [];
+      const str = String(d).trim();
+      const digitsOnly = str.replace(/[^0-9]/g, "");
+      const variations = [str.toLowerCase(), digitsOnly];
+
+      const parts = str.split(/[-/._\s]+/);
+      if (parts.length === 3) {
+        let y, m, day;
+        if (parts[0].length === 4) {
+          [y, m, day] = parts;
+        } else if (parts[2].length === 4) {
+          [day, m, y] = parts;
+        } else if (parts[2].length === 2) {
+          const yrPrefix = parseInt(parts[2], 10) < 50 ? "20" : "19";
+          y = yrPrefix + parts[2].padStart(2, "0");
+          m = parts[0].padStart(2, "0");
+          day = parts[1].padStart(2, "0");
+        }
+        if (y && m && day) {
+          const mm = m.padStart(2, "0");
+          const dd = day.padStart(2, "0");
+          variations.push(`${y}-${mm}-${dd}`, `${dd}-${mm}-${y}`, `${y}/${mm}/${dd}`, `${dd}/${mm}/${y}`, `${y}${mm}${dd}`, `${dd}${mm}${y}`);
+        }
+      }
+      return variations;
+    };
+
+    const passVariations = getDobVariations(cleanPassword);
+    const dbDobVariations = getDobVariations(userDob);
+    const dbPassVariations = getDobVariations(userPass);
 
     const isPasswordValid =
       cleanPassword === "demo123" ||
       userPass === cleanPassword ||
       userDob === cleanPassword ||
-      (userDob && normalizeDateDigits(userDob) === normalizeDateDigits(cleanPassword)) ||
-      (userPass && normalizeDateDigits(userPass) === normalizeDateDigits(cleanPassword));
+      passVariations.some(v => dbDobVariations.includes(v) || dbPassVariations.includes(v));
 
     if (!isPasswordValid) {
-      throw new Error("Incorrect password. Please enter your Date of Birth (e.g. YYYY-MM-DD) or assigned password.");
+      throw new Error("Incorrect password. Please enter your Date of Birth (e.g. YYYY-MM-DD or 20081208) or assigned password.");
     }
 
     // Optional background sync with Firebase Auth
