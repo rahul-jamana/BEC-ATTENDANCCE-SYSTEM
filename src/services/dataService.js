@@ -884,47 +884,98 @@ export const DataService = {
   // --- SESSIONS ---
   async getSessions() {
     if (isLiveFirebaseConfigured && db) {
-      const snap = await getDocs(collection(db, "sessions"));
-      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      try {
+        const snap = await getDocs(collection(db, "sessions"));
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      } catch (e) {
+        console.warn("Firestore getSessions failed, using local sessions:", e);
+      }
     }
-    throw new Error("Firebase is not configured. Cannot load sessions.");
+    try {
+      return JSON.parse(localStorage.getItem("bec_sessions") || "[]");
+    } catch (e) {
+      return [];
+    }
   },
 
   async createSession(sessionData) {
-    if (isLiveFirebaseConfigured && db) {
-      const sessionId = `sess_${Date.now()}`;
-      const newSession = {
-        id: sessionId,
-        ...sessionData,
-        isActive: true,
-        createdAt: new Date().toISOString()
-      };
-      await setDoc(doc(db, "sessions", sessionId), newSession);
-      return newSession;
+    const sessionId = `sess_${Date.now()}`;
+    const newSession = {
+      id: sessionId,
+      ...sessionData,
+      isActive: true,
+      createdAt: new Date().toISOString()
+    };
+
+    let sessions = [];
+    try {
+      sessions = JSON.parse(localStorage.getItem("bec_sessions") || "[]");
+    } catch (e) {
+      sessions = [];
     }
-    throw new Error("Firebase is not configured. Cannot create session.");
+    sessions = sessions.map(s => (s.branch === newSession.branch && s.section === newSession.section) ? { ...s, isActive: false } : s);
+    sessions.push(newSession);
+    localStorage.setItem("bec_sessions", JSON.stringify(sessions));
+
+    if (isLiveFirebaseConfigured && db) {
+      try {
+        await setDoc(doc(db, "sessions", sessionId), newSession);
+      } catch (e) {
+        console.warn("Firestore setDoc failed, local session saved:", e);
+      }
+    }
+    return newSession;
   },
 
   async updateSessionToken(sessionId, token) {
-    if (isLiveFirebaseConfigured && db) {
-      await updateDoc(doc(db, "sessions", sessionId), { token, tokenGeneratedAt: Date.now() });
-      return true;
+    let sessions = [];
+    try {
+      sessions = JSON.parse(localStorage.getItem("bec_sessions") || "[]");
+    } catch (e) {
+      sessions = [];
     }
-    throw new Error("Firebase is not configured. Cannot update session token.");
+    sessions = sessions.map(s => s.id === sessionId ? { ...s, token, tokenGeneratedAt: Date.now() } : s);
+    localStorage.setItem("bec_sessions", JSON.stringify(sessions));
+
+    if (isLiveFirebaseConfigured && db) {
+      try {
+        await updateDoc(doc(db, "sessions", sessionId), { token, tokenGeneratedAt: Date.now() });
+      } catch (e) {}
+    }
+    return true;
   },
 
   async endSession(sessionId) {
-    if (isLiveFirebaseConfigured && db) {
-      await updateDoc(doc(db, "sessions", sessionId), { isActive: false });
-      return true;
+    let sessions = [];
+    try {
+      sessions = JSON.parse(localStorage.getItem("bec_sessions") || "[]");
+    } catch (e) {
+      sessions = [];
     }
-    throw new Error("Firebase is not configured. Cannot end session.");
+    sessions = sessions.map(s => s.id === sessionId ? { ...s, isActive: false } : s);
+    localStorage.setItem("bec_sessions", JSON.stringify(sessions));
+
+    if (isLiveFirebaseConfigured && db) {
+      try {
+        await updateDoc(doc(db, "sessions", sessionId), { isActive: false });
+      } catch (e) {}
+    }
+    return true;
   },
 
   async deleteSession(sessionId) {
+    let sessions = [];
+    try {
+      sessions = JSON.parse(localStorage.getItem("bec_sessions") || "[]");
+    } catch (e) {
+      sessions = [];
+    }
+    sessions = sessions.filter(s => s.id !== sessionId);
+    localStorage.setItem("bec_sessions", JSON.stringify(sessions));
+
     if (isLiveFirebaseConfigured && db) {
-      await deleteDoc(doc(db, "sessions", sessionId));
       try {
+        await deleteDoc(doc(db, "sessions", sessionId));
         const snap = await getDocs(collection(db, "attendance"));
         const related = snap.docs.filter(d => d.data().sessionId === sessionId);
         for (const r of related) {
@@ -933,18 +984,29 @@ export const DataService = {
       } catch (e) {
         console.warn("Could not clean up attendance records for session:", e);
       }
-      return true;
     }
-    throw new Error("Firebase is not configured. Cannot delete session.");
+    return true;
   },
 
   // --- ATTENDANCE ---
   async getAttendance() {
-    if (isLiveFirebaseConfigured && db) {
-      const snap = await getDocs(collection(db, "attendance"));
-      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    let localRecords = [];
+    try {
+      localRecords = JSON.parse(localStorage.getItem("bec_attendance_records") || "[]");
+    } catch (e) {
+      localRecords = [];
     }
-    throw new Error("Firebase is not configured. Cannot load attendance.");
+
+    if (isLiveFirebaseConfigured && db) {
+      try {
+        const snap = await getDocs(collection(db, "attendance"));
+        const fbRecords = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        return [...localRecords, ...fbRecords];
+      } catch (e) {
+        console.warn("Firestore getAttendance warning, using local attendance:", e);
+      }
+    }
+    return localRecords;
   },
 
   async markAttendance({ student, session, token, livePhoto, isManual = false, markedBy = null }) {
