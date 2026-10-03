@@ -145,10 +145,13 @@ export const TeacherDashboard = () => {
 
     // Start 80m Live Geofenced Broadcast for student pop-up notifications
     await DataService.startLiveGeofencedSession({
+      sessionId: newSess.id,
       subject: pendingSessionData.subjectName,
+      subjectId: pendingSessionData.subjectId,
       branch: pendingSessionData.branch,
       year: pendingSessionData.year,
       section: pendingSessionData.section,
+      semester: pendingSessionData.semester,
       teacherName: pendingSessionData.teacherName,
       teacherPhoto: teacherPhotoUrl,
       location: teacherLoc
@@ -237,13 +240,28 @@ export const TeacherDashboard = () => {
     }
   };
 
+  // Helper to match all attendance records for a session regardless of session ID format
+  const getRecordsForSession = (sess) => {
+    if (!sess || !sess.id) return [];
+    const sessDate = sess.createdAt ? new Date(sess.createdAt).toISOString().split("T")[0] : null;
+    return attendanceLogs.filter(a => {
+      if (a.sessionId === sess.id) return true;
+      if (a.parentSessionId === sess.id) return true;
+      if (a.sessionId && a.sessionId.replace('geo_sess_', '') === sess.id.replace('sess_', '')) return true;
+      if (sessDate && a.date === sessDate && a.branch === sess.branch && a.section === sess.section) return true;
+      return false;
+    });
+  };
+
   // Filtered session records for report generation
   const getSessionAttendanceCount = (sessionId) => {
-    return attendanceLogs.filter(a => a.sessionId === sessionId).length;
+    const sess = sessions.find(s => s.id === sessionId);
+    if (!sess) return attendanceLogs.filter(a => a.sessionId === sessionId).length;
+    return getRecordsForSession(sess).length;
   };
 
   const handleExportSessionPDF = async (sess) => {
-    const records = attendanceLogs.filter(a => a.sessionId === sess.id);
+    const records = getRecordsForSession(sess);
     await exportAttendancePDF({
       title: `Class Session ${sess.subjectName}`,
       branch: sess.branch,
@@ -257,7 +275,7 @@ export const TeacherDashboard = () => {
   };
 
   const handleExportSessionExcel = (sess) => {
-    const records = attendanceLogs.filter(a => a.sessionId === sess.id);
+    const records = getRecordsForSession(sess);
     exportTeacherSessionExcel({
       session: sess,
       teacherProfile: userProfile,

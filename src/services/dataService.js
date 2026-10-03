@@ -1407,8 +1407,10 @@ export const DataService = {
 
   // --- LIVE GEOFENCED BROADCAST ATTENDANCE SESSIONS ---
   async startLiveGeofencedSession(sessionData) {
+    const activeId = sessionData.sessionId || `geo_sess_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const session = {
-      id: `geo_sess_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      id: activeId,
+      parentSessionId: sessionData.sessionId || null,
       createdAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(), // Active for 15 mins
       status: "active",
