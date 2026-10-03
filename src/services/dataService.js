@@ -1247,23 +1247,17 @@ export const DataService = {
     });
 
     const stats = sectionSubjects.map(sub => {
-      const liveTotalClasses = classSessions.filter(
+      const totalClasses = classSessions.filter(
         sess => sess.subjectId === sub.id || sess.subjectName === sub.name || sess.subjectId === sub.code || (sess.subjectName && sess.subjectName.toLowerCase().includes(sub.code.toLowerCase()))
       ).length;
 
-      const liveAttendedClasses = allAttendance.filter(
+      const attendedClasses = allAttendance.filter(
         att =>
           (att.studentId === student?.uid || (att.rollNo && att.rollNo === student?.rollNo) || (att.tempId && att.tempId === student?.tempId)) &&
           (att.subjectId === sub.id || att.subjectName === sub.name || att.subjectId === sub.code || (att.subjectName && att.subjectName.toLowerCase().includes(sub.code.toLowerCase())))
       ).length;
 
-      // Base 40 attendance baseline for every student per subject + live class additions
-      const baseClasses = 40;
-      const baseAttended = 40;
-
-      const totalClasses = baseClasses + liveTotalClasses;
-      const attendedClasses = baseAttended + liveAttendedClasses;
-      const percentage = Math.round((attendedClasses / totalClasses) * 100);
+      const percentage = totalClasses > 0 ? Math.round((attendedClasses / totalClasses) * 100) : 100;
 
       return {
         subjectId: sub.id,
@@ -1273,7 +1267,7 @@ export const DataService = {
         totalClasses,
         attendedClasses,
         percentage,
-        isWarning: percentage < 75
+        isWarning: totalClasses > 0 && percentage < 75
       };
     });
 
