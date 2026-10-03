@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { DataService } from "../services/dataService";
 import { getDeviceLocation, calculateDistanceMeters } from "../utils/geoUtils";
-import { playAttendanceAlertChime } from "../utils/soundUtils";
+import { playAttendanceAlertChime, unlockAudio } from "../utils/soundUtils";
 import { db, isLiveFirebaseConfigured } from "../firebase/config";
 import { collection, onSnapshot } from "firebase/firestore";
 import { 
@@ -331,6 +331,7 @@ export const StudentAttendancePopUpModal = () => {
         <div className="fixed bottom-20 right-4 z-[9990] animate-in fade-in slide-in-from-bottom-5">
           <button
             onClick={() => {
+              unlockAudio();
               dismissedSessionIdRef.current = null;
               setIsOpen(true);
               verifyLocation(activeSession);
