@@ -32,15 +32,15 @@ export const isWithinClassroomRadius = (teacherLoc, studentLoc, maxRadiusMeters 
 };
 
 // Get current device GPS coordinates via browser Geolocation API
-export const getDeviceLocation = () => {
+export const getDeviceLocation = (forcePrompt = false) => {
   return new Promise((resolve) => {
     if (!navigator.geolocation) {
-      // Fallback default coordinates if GPS unavailable (Bhubaneswar Engineering College Campus)
       resolve({
         latitude: 20.2485,
         longitude: 85.8012,
         accuracy: 10,
-        isMock: true
+        isMock: true,
+        error: "GPS not supported on device"
       });
       return;
     }
@@ -55,19 +55,19 @@ export const getDeviceLocation = () => {
         });
       },
       (error) => {
-        console.warn("Geolocation warning/error, using default campus GPS for testing:", error.message);
-        // Default to simulated campus GPS location if user denies or browser blocks GPS
+        console.warn("Geolocation permission/timeout, using campus classroom GPS:", error.message);
         resolve({
           latitude: 20.2485,
           longitude: 85.8012,
           accuracy: 15,
-          isMock: true
+          isMock: true,
+          error: error.message
         });
       },
       {
-        enableHighAccuracy: true,
-        timeout: 8000,
-        maximumAge: 0
+        enableHighAccuracy: !forcePrompt,
+        timeout: 4000,
+        maximumAge: 10000
       }
     );
   });
