@@ -135,14 +135,23 @@ export const StudentAttendancePopUpModal = () => {
       checkLocalFallback();
     };
 
+    const handleForceReopen = () => {
+      dismissedSessionIdRef.current = null;
+      if (activeSessionRef.current) {
+        setIsOpen(true);
+      }
+    };
+
     window.addEventListener("bec_live_session_started", handleCustomBroadcast);
     window.addEventListener("storage", handleCustomBroadcast);
+    window.addEventListener("bec_reopen_popup_modal", handleForceReopen);
 
     return () => {
       clearInterval(interval);
       if (unsubscribe) unsubscribe();
       window.removeEventListener("bec_live_session_started", handleCustomBroadcast);
       window.removeEventListener("storage", handleCustomBroadcast);
+      window.removeEventListener("bec_reopen_popup_modal", handleForceReopen);
     };
   }, [userProfile?.uid, userProfile?.branch, userProfile?.year, userProfile?.section]);
 

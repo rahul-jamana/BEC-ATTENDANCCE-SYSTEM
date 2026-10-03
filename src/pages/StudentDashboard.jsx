@@ -257,6 +257,31 @@ export const StudentDashboard = () => {
           </div>
         </div>
 
+        {/* Active Live Broadcast Class Banner (Re-Open Pop-Up Modal if Closed) */}
+        {activeLiveSession && (
+          <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 text-white rounded-3xl p-5 shadow-xl border border-blue-300 flex items-center justify-between gap-4 animate-in fade-in">
+            <div className="flex items-center space-x-3">
+              <div className="p-3 bg-white/20 rounded-2xl ring-2 ring-white/30 shrink-0">
+                <BellRing className="w-6 h-6 text-amber-300 animate-pulse" />
+              </div>
+              <div>
+                <div className="text-[10px] uppercase font-bold tracking-widest text-blue-200">Live Broadcast Active Now</div>
+                <h3 className="text-base font-extrabold">{activeLiveSession.subject || activeLiveSession.subjectName || "Ongoing Class Lecture"}</h3>
+                <p className="text-xs text-blue-100 font-medium">Faculty: {activeLiveSession.teacherName || "Faculty"} • Sec {activeLiveSession.section}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent("bec_reopen_popup_modal"));
+              }}
+              className="px-5 py-3 bg-white text-blue-900 font-extrabold text-xs rounded-2xl hover:bg-blue-50 transition-transform active:scale-95 shadow-lg shrink-0 flex items-center space-x-1.5 cursor-pointer"
+            >
+              <Sparkles className="w-4 h-4 text-amber-500" />
+              <span>Open Attendance Pop-Up</span>
+            </button>
+          </div>
+        )}
+
         {/* Low Attendance Warning Alert (<75%) */}
         {isOverallWarning && (
           <div className="bg-red-50 border-2 border-red-300 rounded-3xl p-5 shadow-sm flex items-start space-x-4 animate-in fade-in">

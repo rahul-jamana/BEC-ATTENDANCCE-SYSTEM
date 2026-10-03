@@ -1514,13 +1514,31 @@ export const DataService = {
   },
 
   async submitGeofencedAttendance(recordData) {
+    const docId = `geo_att_${recordData.sessionId || Date.now()}_${recordData.studentId}`;
     const attendanceRecord = {
-      id: `geo_att_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      id: docId,
+      sessionId: recordData.sessionId,
+      studentId: recordData.studentId,
+      studentName: recordData.studentName,
+      rollNo: recordData.rollNo || "",
+      tempId: recordData.rollNo || "",
+      regNo: recordData.regNo || "",
+      branch: recordData.branch,
+      year: recordData.year,
+      section: recordData.section,
+      semester: recordData.semester || "1",
+      subjectId: recordData.subjectId || "GEO101",
+      subjectName: recordData.sessionTitle || recordData.subject || "Live Lecture",
+      markedAt: new Date().toISOString(),
       timestamp: new Date().toISOString(),
       date: new Date().toISOString().split("T")[0],
       status: "present",
       method: "80m_geofenced_selfie",
-      ...recordData
+      selfiePhoto: recordData.selfiePhoto,
+      livePhoto: recordData.selfiePhoto,
+      photoVerified: true,
+      distanceMeters: recordData.distanceMeters,
+      location: recordData.location
     };
 
     // Store in local attendance store
@@ -1540,8 +1558,14 @@ export const DataService = {
     records.push(attendanceRecord);
     localStorage.setItem("bec_attendance_records", JSON.stringify(records));
 
-    // Also sync to DataService attendance logs
-    await this.addAttendanceRecord(attendanceRecord);
+    // Also sync directly to Cloud Firestore attendance collection for Teacher Excel & PDF exports
+    if (isLiveFirebaseConfigured && db) {
+      try {
+        await setDoc(doc(db, "attendance", docId), attendanceRecord);
+      } catch (e) {
+        console.warn("Firestore submitGeofencedAttendance setDoc warning:", e);
+      }
+    }
 
     return attendanceRecord;
   }
