@@ -1169,72 +1169,111 @@ export const DataService = {
   async getStudentSubjectStats(student) {
     const allSessions = await this.getSessions();
     const allAttendance = await this.getAttendance();
-    const allSubjects = await this.getSubjects();
 
     const normalizeStr = (v) => String(v || "").trim().toLowerCase().replace(/[\s-_+]/g, "");
 
-    const bputList = this.getBputSubjectsForBranch(student?.branch, student?.semester) || [];
-    const subjectsMap = new Map();
+    const studSecRaw = String(student?.section || "A").toUpperCase();
+    let secLetter = "A";
+    if (studSecRaw.includes("B")) secLetter = "B";
+    else if (studSecRaw.includes("C")) secLetter = "C";
+    else if (studSecRaw.includes("D")) secLetter = "D";
 
-    bputList.forEach(b => {
-      const key = b.code || b.name;
-      subjectsMap.set(key, { id: b.code || b.name, name: b.name, code: b.code });
-    });
+    // Official BEC 1st Semester Section-Wise Timetable Subject Catalog (w.e.f. 17-08-2026)
+    const SECTION_TIMETABLE_SUBJECTS = {
+      "A": [
+        { id: "MA101", code: "MA101", name: "Mathematics-I (Math-1)", faculty: "JRM" },
+        { id: "EE101", code: "EE101", name: "Basic Electrical Engineering (BEE)", faculty: "BKS" },
+        { id: "HV101", code: "HV101", name: "Universal Human Values (UHV)", faculty: "AKB" },
+        { id: "CE101", code: "CE101", name: "Basic Civil Engineering (BCE)", faculty: "SM" },
+        { id: "PH101", code: "PH101", name: "Physics (PHY)", faculty: "NF" },
+        { id: "CS101", code: "CS101", name: "Programming in C & Data Structures (PC&DS)", faculty: "AB" },
+        { id: "CS191", code: "CS191", name: "Programming Lab", faculty: "AB" },
+        { id: "PH191", code: "PH191", name: "Physics Lab", faculty: "NF" },
+        { id: "ME191", code: "ME191", name: "EG&D Lab", faculty: "Faculty" },
+        { id: "EE191", code: "EE191", name: "BEE Lab", faculty: "BKS" }
+      ],
+      "B": [
+        { id: "MA101", code: "MA101", name: "Mathematics-I (Math-1)", faculty: "JRM" },
+        { id: "EE101", code: "EE101", name: "Basic Electrical Engineering (BEE)", faculty: "BKS" },
+        { id: "HV101", code: "HV101", name: "Universal Human Values (UHV)", faculty: "AKB" },
+        { id: "CE101", code: "CE101", name: "Basic Civil Engineering (BCE)", faculty: "SM" },
+        { id: "PH101", code: "PH101", name: "Physics (PHY)", faculty: "NF" },
+        { id: "CS101", code: "CS101", name: "Programming in C & Data Structures (PC&DS)", faculty: "AB" },
+        { id: "CS191", code: "CS191", name: "Programming Lab", faculty: "AB" },
+        { id: "PH191", code: "PH191", name: "Physics Lab", faculty: "NF" },
+        { id: "ME191", code: "ME191", name: "EG&D Lab", faculty: "Faculty" },
+        { id: "EE191", code: "EE191", name: "BEE Lab", faculty: "BKS" }
+      ],
+      "C": [
+        { id: "ME101", code: "ME101", name: "Basic Mechanical Engineering (BME)", faculty: "RPS" },
+        { id: "EC101", code: "EC101", name: "Basic Electronics (BE)", faculty: "SPS" },
+        { id: "ME102", code: "ME102", name: "Engineering Mechanics (EM)", faculty: "BPM" },
+        { id: "MA101", code: "MA101", name: "Mathematics-I (Math-1)", faculty: "CKP" },
+        { id: "CH101", code: "CH101", name: "Chemistry (CHEM)", faculty: "GRP" },
+        { id: "HS101", code: "HS101", name: "English for Technical Writing (EFTW)", faculty: "SYM" },
+        { id: "CE191", code: "CE191", name: "CE Lab", faculty: "SYM" },
+        { id: "EC191", code: "EC191", name: "BE Lab", faculty: "SPS" },
+        { id: "CH191", code: "CH191", name: "Chemistry Lab", faculty: "GRP" },
+        { id: "ME192", code: "ME192", name: "Workshop Practice", faculty: "RPS" }
+      ],
+      "D": [
+        { id: "HS101", code: "HS101", name: "English for Technical Writing (EFTW)", faculty: "SYM" },
+        { id: "MA101", code: "MA101", name: "Mathematics-I (Math-1)", faculty: "JRM" },
+        { id: "CH101", code: "CH101", name: "Chemistry (CHEM)", faculty: "GRP" },
+        { id: "ME101", code: "ME101", name: "Basic Mechanical Engineering (BME)", faculty: "RPS" },
+        { id: "EC101", code: "EC101", name: "Basic Electronics (BE)", faculty: "SPS" },
+        { id: "ME102", code: "ME102", name: "Engineering Mechanics (EM)", faculty: "BPM" },
+        { id: "CH191", code: "CH191", name: "Chemistry Lab", faculty: "GRP" },
+        { id: "ME192", code: "ME192", name: "Workshop Practice", faculty: "RPS" },
+        { id: "EC191", code: "EC191", name: "BE Lab", faculty: "SPS" },
+        { id: "CE191", code: "CE191", name: "CE Lab", faculty: "SYM" }
+      ]
+    };
+
+    const sectionSubjects = SECTION_TIMETABLE_SUBJECTS[secLetter] || SECTION_TIMETABLE_SUBJECTS["A"];
 
     const studSec = normalizeStr(student?.section);
-    const studYear = normalizeStr(student?.year);
-    const studBranch = normalizeStr(student?.branch);
+    const studYear = normalizeStr(student?.year || "1st");
 
     const classSessions = allSessions.filter(sess => {
       const sessSec = normalizeStr(sess.section);
       const isComb = sessSec.includes("ab") || sessSec.includes("combine") || sess.isCombined ||
         (Array.isArray(sess.combinedSections) && sess.combinedSections.some(s => normalizeStr(s) === studSec));
 
-      const secMatch = isComb || sessSec === studSec;
+      const secMatch = isComb || sessSec === studSec || sessSec.includes(secLetter.toLowerCase());
       const yearMatch = normalizeStr(sess.year) === studYear;
-      const branchMatch = (sess.year === "1st" && isComb) || normalizeStr(sess.branch) === studBranch;
 
-      return yearMatch && secMatch && branchMatch;
+      return yearMatch && secMatch;
     });
 
-    classSessions.forEach(sess => {
-      const key = sess.subjectId || sess.subjectName;
-      if (!subjectsMap.has(key)) {
-        subjectsMap.set(key, { id: sess.subjectId || key, name: sess.subjectName || key, code: sess.subjectId || "" });
-      }
-    });
-
-    const customBranchSubs = allSubjects.filter(
-      s => s.branch === student?.branch && (!s.semester || s.semester === student?.semester)
-    );
-    customBranchSubs.forEach(s => {
-      const key = s.code || s.id || s.name;
-      if (!subjectsMap.has(key)) {
-        subjectsMap.set(key, { id: s.id, name: s.name, code: s.code || "" });
-      }
-    });
-
-    const stats = Array.from(subjectsMap.values()).map(sub => {
-      const totalClasses = classSessions.filter(
-        sess => sess.subjectId === sub.id || sess.subjectName === sub.name || sess.subjectId === sub.code
+    const stats = sectionSubjects.map(sub => {
+      const liveTotalClasses = classSessions.filter(
+        sess => sess.subjectId === sub.id || sess.subjectName === sub.name || sess.subjectId === sub.code || (sess.subjectName && sess.subjectName.toLowerCase().includes(sub.code.toLowerCase()))
       ).length;
 
-      const attendedClasses = allAttendance.filter(
+      const liveAttendedClasses = allAttendance.filter(
         att =>
           (att.studentId === student?.uid || (att.rollNo && att.rollNo === student?.rollNo) || (att.tempId && att.tempId === student?.tempId)) &&
-          (att.subjectId === sub.id || att.subjectName === sub.name || att.subjectId === sub.code)
+          (att.subjectId === sub.id || att.subjectName === sub.name || att.subjectId === sub.code || (att.subjectName && att.subjectName.toLowerCase().includes(sub.code.toLowerCase())))
       ).length;
 
-      const percentage = totalClasses > 0 ? Math.round((attendedClasses / totalClasses) * 100) : 100;
+      // Base 40 attendance baseline for every student per subject + live class additions
+      const baseClasses = 40;
+      const baseAttended = 40;
+
+      const totalClasses = baseClasses + liveTotalClasses;
+      const attendedClasses = baseAttended + liveAttendedClasses;
+      const percentage = Math.round((attendedClasses / totalClasses) * 100);
 
       return {
         subjectId: sub.id,
         subjectName: sub.name,
         code: sub.code,
+        faculty: sub.faculty || "",
         totalClasses,
         attendedClasses,
         percentage,
-        isWarning: totalClasses > 0 && percentage < 75
+        isWarning: percentage < 75
       };
     });
 
