@@ -86,13 +86,22 @@ export const StudentAttendancePopUpModal = () => {
           const activeSess = activeDocs.find(s => {
             if (s.status !== "active" || s.expiresAt <= now) return false;
 
+            const sessSec = (s.section || "").toUpperCase();
+            const studSec = (userProfile?.section || "").toUpperCase();
+
+            // Match Section: if session section is Combined/All OR contains student's section (e.g. "B")
+            const matchesSection = 
+              sessSec.includes("COMBINE") || 
+              sessSec.includes("ALL") || 
+              (studSec && sessSec.includes(studSec)) ||
+              (studSec && studSec.includes(sessSec));
+
+            if (!matchesSection) return false;
+
+            // Match Year: 1st Year matches 1st Year, upper years match year
             const sYear = s.year || "1st";
             const studYear = userProfile?.year || "1st";
             if (sYear === "1st" && studYear === "1st") return true;
-
-            const sessSec = (s.section || "").toUpperCase();
-            const studSec = (userProfile?.section || "").toUpperCase();
-            if (sessSec.includes("COMBINE") || sessSec.includes("ALL") || (studSec && sessSec.includes(studSec))) return true;
 
             return (!userProfile?.year || s.year === userProfile.year);
           });
