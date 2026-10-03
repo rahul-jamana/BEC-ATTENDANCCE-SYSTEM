@@ -15,6 +15,7 @@ export const StudentAttendancePopUpModal = () => {
   const [activeSession, setActiveSession] = useState(null);
   const [isOpen, setIsOpen] = useState(false);
   const [hasDismissed, setHasDismissed] = useState(false);
+  const [hasMarkedPresent, setHasMarkedPresent] = useState(false);
 
   // Geolocation & Selfie State
   const [studentLoc, setStudentLoc] = useState(null);
@@ -40,38 +41,59 @@ export const StudentAttendancePopUpModal = () => {
     activeSessionRef.current = activeSession;
   }, [activeSession]);
 
+  const checkIfAlreadyMarked = async (session) => {
+    if (!session || !userProfile) return false;
+    try {
+      const logs = await DataService.getAttendance();
+      const isMarked = logs.some(a => 
+        (a.sessionId === session.id || a.parentSessionId === session.id) &&
+        (a.studentId === userProfile.uid || (userProfile.rollNo && a.rollNo === userProfile.rollNo))
+      );
+      setHasMarkedPresent(isMarked);
+      return isMarked;
+    } catch (e) {
+      return false;
+    }
+  };
+
   // Real-Time Cloud Firestore Listener + Safe Local Storage Polling
   useEffect(() => {
     if (!userProfile || userProfile.role !== "student") return;
 
-    const handleSessionChange = (session) => {
+    const handleSessionChange = async (session) => {
       if (!session) {
         if (activeSessionRef.current) {
           setActiveSession(null);
           setIsOpen(false);
+          setHasMarkedPresent(false);
         }
         return;
       }
 
-      // Skip if user dismissed this session
-      if (dismissedSessionIdRef.current === session.id) return;
+      const isMarked = await checkIfAlreadyMarked(session);
 
       const currentId = activeSessionRef.current?.id;
 
       if (session.id !== currentId) {
         setActiveSession(session);
-        setIsOpen(true);
+        
+        // Only open full modal automatically if student hasn't marked present & hasn't dismissed
+        if (!isMarked && dismissedSessionIdRef.current !== session.id) {
+          setIsOpen(true);
 
-        if (playedAudioRef.current !== session.id) {
-          playedAudioRef.current = session.id;
-          try {
-            playAttendanceAlertChime();
-          } catch (soundErr) {
-            console.warn("Audio chime suppressed:", soundErr);
+          if (playedAudioRef.current !== session.id) {
+            playedAudioRef.current = session.id;
+            try {
+              playAttendanceAlertChime();
+            } catch (soundErr) {
+              console.warn("Audio chime suppressed:", soundErr);
+            }
           }
-        }
 
-        verifyLocation(session);
+          verifyLocation(session);
+        } else {
+          setIsOpen(false);
+        }
       }
     };
 
@@ -279,6 +301,7 @@ export const StudentAttendancePopUpModal = () => {
       });
 
       setSuccessToast(true);
+      setHasMarkedPresent(true);
       setTimeout(() => {
         setIsOpen(false);
         setHasDismissed(true);
@@ -301,11 +324,34 @@ export const StudentAttendancePopUpModal = () => {
     stopCamera();
   };
 
-  if (!isOpen || !activeSession) return null;
-
   return (
-    <div className="fixed inset-0 z-[9999] bg-slate-900/70 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
-      <div className="bg-white max-w-md w-full rounded-3xl shadow-2xl border border-blue-100 overflow-hidden transform transition-all scale-100 relative">
+    <>
+      {/* 1. Mini Floating Side Widget Bubble (Visible if active class & unmarked & modal closed) */}
+      {!isOpen && activeSession && !hasMarkedPresent && (
+        <div className="fixed bottom-20 right-4 z-[9990] animate-in fade-in slide-in-from-bottom-5">
+          <button
+            onClick={() => {
+              dismissedSessionIdRef.current = null;
+              setIsOpen(true);
+              verifyLocation(activeSession);
+            }}
+            className="px-4 py-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 active:from-blue-700 active:to-sky-700 text-white rounded-2xl shadow-2xl border-2 border-white/40 flex items-center space-x-2.5 hover:scale-105 active:scale-95 transition-all cursor-pointer group"
+          >
+            <div className="p-2 bg-white/20 rounded-xl group-hover:rotate-12 transition-transform">
+              <BellRing className="w-5 h-5 text-amber-300 animate-pulse" />
+            </div>
+            <div className="text-left">
+              <div className="text-[10px] font-extrabold text-blue-200 uppercase tracking-widest leading-none">Live Attendance Active</div>
+              <div className="text-xs font-black tracking-wide text-white mt-0.5">Tap to Mark Present 📸</div>
+            </div>
+          </button>
+        </div>
+      )}
+
+      {/* 2. Full-Screen Geofenced Selfie Verification Modal */}
+      {isOpen && activeSession && (
+        <div className="fixed inset-0 z-[9999] bg-slate-900/70 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white max-w-md w-full rounded-3xl shadow-2xl border border-blue-100 overflow-hidden transform transition-all scale-100 relative">
         
         {/* Header Banner */}
         <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 p-5 text-white relative overflow-hidden">
@@ -494,5 +540,7 @@ export const StudentAttendancePopUpModal = () => {
         </div>
       </div>
     </div>
+    )}
+    </>
   );
 };
