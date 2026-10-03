@@ -240,15 +240,13 @@ export const TeacherDashboard = () => {
     }
   };
 
-  // Helper to match all attendance records for a session regardless of session ID format
+  // Helper to match attendance records strictly for an individual session
   const getRecordsForSession = (sess) => {
     if (!sess || !sess.id) return [];
-    const sessDate = sess.createdAt ? new Date(sess.createdAt).toISOString().split("T")[0] : null;
     return attendanceLogs.filter(a => {
       if (a.sessionId === sess.id) return true;
       if (a.parentSessionId === sess.id) return true;
       if (a.sessionId && a.sessionId.replace('geo_sess_', '') === sess.id.replace('sess_', '')) return true;
-      if (sessDate && a.date === sessDate && a.branch === sess.branch && a.section === sess.section) return true;
       return false;
     });
   };
