@@ -31,67 +31,80 @@ export const StudentAttendancePopUpModal = () => {
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const activeSessionRef = useRef(null);
+  const dismissedSessionIdRef = useRef(null);
+  const playedAudioRef = useRef(null);
 
-  // Listen for instant live broadcast events via Cloud Firestore onSnapshot & local polling
+  // Keep activeSessionRef updated
+  useEffect(() => {
+    activeSessionRef.current = activeSession;
+  }, [activeSession]);
+
+  // Real-Time Cloud Firestore Listener + Safe Local Storage Polling
   useEffect(() => {
     if (!userProfile || userProfile.role !== "student") return;
 
-    const processSession = (session) => {
-      if (session) {
-        if (session.id !== activeSession?.id || !isOpen) {
-          setActiveSession(session);
-          setIsOpen(true);
+    const handleSessionChange = (session) => {
+      if (!session) {
+        if (activeSessionRef.current) {
+          setActiveSession(null);
+          setIsOpen(false);
+        }
+        return;
+      }
+
+      // Skip if user dismissed this session
+      if (dismissedSessionIdRef.current === session.id) return;
+
+      const currentId = activeSessionRef.current?.id;
+
+      if (session.id !== currentId) {
+        setActiveSession(session);
+        setIsOpen(true);
+
+        if (playedAudioRef.current !== session.id) {
+          playedAudioRef.current = session.id;
           try {
             playAttendanceAlertChime();
           } catch (soundErr) {
-            console.warn("Audio autoplay suppressed by browser:", soundErr);
+            console.warn("Audio chime suppressed:", soundErr);
           }
-          verifyLocation(session);
         }
-      } else if (!session && activeSession) {
-        setActiveSession(null);
-        setIsOpen(false);
+
+        verifyLocation(session);
       }
     };
 
-    const checkLiveSession = async () => {
-      try {
-        const session = await DataService.getActiveGeofencedSession(
-          userProfile.branch,
-          userProfile.year,
-          userProfile.section
-        );
-        processSession(session);
-      } catch (err) {
-        console.error("Error checking live geofenced session:", err);
-      }
-    };
-
-    checkLiveSession();
-    const interval = setInterval(checkLiveSession, 1000); // 1s polling
-
-    window.addEventListener("bec_live_session_started", checkLiveSession);
-    window.addEventListener("storage", checkLiveSession);
-
-    // Real-Time Cloud Firestore WebSocket Listener for Multi-Device Push (Laptop -> Phone)
+    // 1. Primary Source of Truth: Firestore Real-Time Listener
     let unsubscribe = null;
     if (isLiveFirebaseConfigured && db) {
       try {
         unsubscribe = onSnapshot(collection(db, "live_geo_sessions"), (snapshot) => {
           const now = new Date().toISOString();
           const activeDocs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+
           const activeSess = activeDocs.find(s => {
             if (s.status !== "active" || s.expiresAt <= now) return false;
+
             const sYear = s.year || "1st";
             const studYear = userProfile?.year || "1st";
             if (sYear === "1st" && studYear === "1st") return true;
+
             const sessSec = (s.section || "").toUpperCase();
             const studSec = (userProfile?.section || "").toUpperCase();
             if (sessSec.includes("COMBINE") || sessSec.includes("ALL") || (studSec && sessSec.includes(studSec))) return true;
+
             return (!userProfile?.year || s.year === userProfile.year);
           });
+
           if (activeSess) {
-            processSession(activeSess);
+            handleSessionChange(activeSess);
+          } else {
+            // Teacher closed session or session expired -> Close Pop-Up immediately
+            if (activeSessionRef.current) {
+              setActiveSession(null);
+              setIsOpen(false);
+            }
           }
         });
       } catch (e) {
@@ -99,13 +112,39 @@ export const StudentAttendancePopUpModal = () => {
       }
     }
 
+    // 2. Secondary Local Storage Polling (only if Firestore is not active)
+    const checkLocalFallback = async () => {
+      if (isLiveFirebaseConfigured && db) return; // Skip if Firestore is handling real-time push
+
+      try {
+        const session = await DataService.getActiveGeofencedSession(
+          userProfile.branch,
+          userProfile.year,
+          userProfile.section
+        );
+        handleSessionChange(session);
+      } catch (err) {
+        console.error("Error checking live session fallback:", err);
+      }
+    };
+
+    checkLocalFallback();
+    const interval = setInterval(checkLocalFallback, 2000);
+
+    const handleCustomBroadcast = () => {
+      checkLocalFallback();
+    };
+
+    window.addEventListener("bec_live_session_started", handleCustomBroadcast);
+    window.addEventListener("storage", handleCustomBroadcast);
+
     return () => {
       clearInterval(interval);
       if (unsubscribe) unsubscribe();
-      window.removeEventListener("bec_live_session_started", checkLiveSession);
-      window.removeEventListener("storage", checkLiveSession);
+      window.removeEventListener("bec_live_session_started", handleCustomBroadcast);
+      window.removeEventListener("storage", handleCustomBroadcast);
     };
-  }, [userProfile, activeSession, isOpen]);
+  }, [userProfile?.uid, userProfile?.branch, userProfile?.year, userProfile?.section]);
 
   const verifyLocation = async (sessionToVerify = activeSession, forceCampusOverride = false) => {
     if (!sessionToVerify) return;
@@ -236,6 +275,9 @@ export const StudentAttendancePopUpModal = () => {
   };
 
   const handleDismiss = () => {
+    if (activeSession) {
+      dismissedSessionIdRef.current = activeSession.id;
+    }
     setIsOpen(false);
     setHasDismissed(true);
     stopCamera();

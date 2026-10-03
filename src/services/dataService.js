@@ -1,6 +1,6 @@
 import { db, isLiveFirebaseConfigured } from "../firebase/config";
 import {
-  collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc
+  collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where
 } from "firebase/firestore";
 
 import { FIRST_YEAR_STUDENTS } from "../data/students1stYear";
@@ -960,6 +960,13 @@ export const DataService = {
         await updateDoc(doc(db, "sessions", sessionId), { isActive: false });
       } catch (e) {}
     }
+
+    // Automatically close any live geofenced broadcast session associated or active
+    try {
+      await this.closeLiveGeofencedSession(sessionId);
+    } catch (e) {
+      console.warn("Error closing associated live geofenced session:", e);
+    }
     return true;
   },
 
@@ -1481,8 +1488,28 @@ export const DataService = {
       sessions = [];
     }
 
-    sessions = sessions.map(s => s.id === sessionId ? { ...s, status: "closed" } : s);
+    if (sessionId) {
+      sessions = sessions.map(s => (s.id === sessionId || s.sessionId === sessionId) ? { ...s, status: "closed" } : s);
+    } else {
+      sessions = sessions.map(s => ({ ...s, status: "closed" }));
+    }
     localStorage.setItem("bec_live_geo_sessions", JSON.stringify(sessions));
+
+    // Also update Cloud Firestore so student device listeners receive status: "closed"
+    if (isLiveFirebaseConfigured && db) {
+      try {
+        if (sessionId) {
+          await updateDoc(doc(db, "live_geo_sessions", sessionId), { status: "closed" }).catch(() => {});
+        }
+        // Also close all active documents in live_geo_sessions collection
+        const q = query(collection(db, "live_geo_sessions"), where("status", "==", "active"));
+        const snap = await getDocs(q);
+        const updatePromises = snap.docs.map(d => updateDoc(d.ref, { status: "closed" }));
+        await Promise.all(updatePromises);
+      } catch (e) {
+        console.warn("Firestore closeLiveGeofencedSession error:", e);
+      }
+    }
     return true;
   },
 
